@@ -1,0 +1,1112 @@
+
+
+// Get Source from OCP4 install Lab //
+
+# SAP DataHub Deployment Lab
+
+
+## Provision lab environemnt
+// identical OCP4 Install
+Provision the following Lab from https://labs.opentlc.com
+
+Services → Catalogs → All Services → OPENTLC OpenShift 4 Labs → OpenShift 4 Installation Lab
+
+You will get an email with your GUID and your sandbox domain:
+
+ - GUID. 4char
+ - toplevel domain: .sandboxNNN.opentlc.com
+ - AWS access Credentials
+ - bastion host with password
+
+## Set Up  Installation prerequisites
+
+. Login to the bastion host
++
+----
+ssh <OPENTLC User Name>@bastion.<GUID>.sandbox<SANDBOXID>.opentlc.com
+sudo -i
+echo ${GUID}
+----
+
+. Update to current OS release
++
+----
+sudo yum update -y
+sudo reboot
+----
++
+NOTE: You can also reboot at the end of the setup
+
+. Install the following packages
++
+----
+ sudo yum -y install python2-boto python2-boto3 jq docker
+----
+
+. Check your host
++
+----
+# cat /etc/redhat-release
+Red Hat Enterprise Linux Server release 7.6 (Maipo)
+# curl http://169.254.169.254/latest/dynamic/instance-identity/document/
+{
+  "accountId" : "126521742790",
+  "imageId" : "ami-092acf20fad7f7795",
+  "availabilityZone" : "eu-west-1b",
+  "ramdiskId" : null,
+  "kernelId" : null,
+  "privateIp" : "192.168.0.202",
+  "devpayProductCodes" : null,
+  "marketplaceProductCodes" : null,
+  "version" : "2017-09-30",
+  "region" : "eu-west-1",
+  "billingProducts" : [ "bp-6fa54006" ],
+  "instanceId" : "i-0a5109ae466c67f2d",
+  "pendingTime" : "2019-10-31T13:14:24Z",
+  "architecture" : "x86_64",
+  "instanceType" : "t2.large"
+----
++
+NOTE: Make note of the region, in this case `eu-west-1`
+
+. Download AWS Cli for verification
++
+----
+# Download the latest AWS Command Line Interface
+curl "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip"
+unzip awscli-bundle.zip
+
+# Install the AWS CLI into /bin/aws
+sudo ./awscli-bundle/install -i /usr/local/aws -b /bin/aws
+
+# Validate that the AWS CLI works
+aws --version
+
+# Clean up downloaded files
+rm -rf awscli-bundle awscli-bundle.zip
+----
+
+. Get OCP installer binaries
++
+----
+OCP_VERSION=4.2.8
+wget https://mirror.openshift.com/pub/openshift-v4/clients/ocp/${OCP_VERSION}/openshift-install-linux-${OCP_VERSION}.tar.gz
+sudo tar zxvf openshift-install-linux-${OCP_VERSION}.tar.gz -C /usr/bin
+sudo rm -f openshift-install-linux-${OCP_VERSION}.tar.gz /usr/bin/README.md
+sudo chmod +x /usr/bin/openshift-install
+----
+
+. get oc CLI tool
++
+----
+wget https://mirror.openshift.com/pub/openshift-v4/clients/ocp/${OCP_VERSION}/openshift-client-linux-${OCP_VERSION}.tar.gz
+sudo tar zxvf openshift-client-linux-${OCP_VERSION}.tar.gz -C /usr/bin
+sudo rm -f openshift-client-linux-${OCP_VERSION}.tar.gz /usr/bin/README.md
+sudo chmod +x /usr/bin/oc /usr/bin/kubectl
+----
+
+. setup bash completion
++
+----
+oc completion bash | sudo tee /etc/bash_completion.d/openshift > /dev/null
+----
+
+. setup AWS account
++
+----
+cat > credentials << EOT
+export AWS_ACCESS_KEY="<YOURACCESSKEY>"
+export AWS_SECRET_KEY="<YOURSECRETKEY>"
+export REGION=<take region from step (4)>
+EOT
+
+. ./credentials
+
+mkdir $HOME/.aws
+cat << EOF >>  $HOME/.aws/credentials
+[default]
+aws_access_key_id = ${AWS_ACCESS_KEY}
+aws_secret_access_key = ${AWS_SECRET_KEY}
+region = $REGION
+EOF
+----
+
+. Test AWS account
++
+----
+aws sts get-caller-identity
+----
+
+. Create an SSH keypair to be used for your OpenShift environment:
++
+----
+ssh-keygen -f ~/.ssh/sdh-${GUID}-key -N ''
+----
+
+## Minimum Requirements for DATAHUB on OCP4
+
+
+
+The table below lists the minimum requirements and the minimum number of instances for each node type. This is sufficient of a PoC (Proof of Concept) environments.
+
+.Datahub Requirements
+[width="40%",frame="topbot",options="header,footer"]
+|===================================================================================
+| Type  | Count| Operating System |vCPU| RAM (GB)|Storage (GB)| AWS  Instance Type
+| Bootstrap |1 | RHCOS            |2|16| 120 |i3.large
+| Master    |3+| RHCOS            |4|16| 120 |m4.xlarge
+| Compute   |3+| RHEL 7.6 or RHCOS|4|32| 120 |m4.2xlarge
+| Jump host |1 | RHEL 7.6         |2| 4| 75  |t2.medium
+|===================================================================================
+
+For details on production see https://access.redhat.com/articles/4324391
+
+## Install OCP 4.2 for SAP DataHub
+
+. prepare Installation:
++
+----
+openshift-install create install-config --dir $HOME/sdh-${GUID}
+----
++
+Use the following answers (replace XXXX and GUID accordningly):
++
+----
+? SSH Public Key  [Use arrows to move, type to filter, ? for more help]
+> /home/mkoch-redhat.com/.ssh/sdh-fb46-key.pub
+  <none>
+? Platform aws
+? Region <region from above>
+? Base Domain sandbox{XXXX}.opentlc.com
+? Cluster Name sdh-{GUID}
+? Pull Secret [? for help]
+----
++
+Grab the pull secret from link:https://cloud.redhat.com/openshift/install/aws/installer-provisioned[the AWS IPI installer page]
+
+
+. modify/adapt *compute* nodes regarding SDH requirements in `install-config.yaml`:
++
+replace:
++
+----
+[..]
+compute:
+- hyperthreading: Enabled
+  name: worker
+  platform: {}
+  replicas: 3
+[..]
+----
++
+by:
++
+----
+[..]
+compute:
+- hyperthreading: Enabled
+  name: worker
+  platform:
+    aws:
+      type: m4.2xlarge
+  replicas: 3
+[..]
+----
++
+NOTE: You may save you install-config.yaml for future use Now
+
+. Create the YAML manifests:
++
+----
+openshift-install create manifests --dir $HOME/sdh-${GUID}
+----
+
+. Disable schedulable masters (Optional)
++
+In OCP 4.2 masters are schedulable by default. If you don't like it, mark them as not schedulable during the installation:
++
+----
+find "$HOME/sdh-${GUID}/manifests" -type f -name 'cluster-scheduler-*-config.yml' -print0 | \
+        xargs -0 -r sed -i 's/^\(\s*mastersSchedulable:\s*\)true/\1false/'
+
+----
+
+. Create the Ignition configuration files:
++
+----
+openshift-install create ignition-configs --dir $HOME/sdh-${GUID}
+----
+
+. Modify the worker ignition file to preload kernel modules required for storage and systemd
++
+WARNING: This is not supported but saves time, supported is to do it after initial installation by changing the machine sets
++
+For use with SAP Datahub the CoreOS nodes need to preload certain kernel modules. This can be done by filling the storage and systemd fields in the ignition file.
+In the storage field we create a file containing the kernel modules that need to be preloaded, in the systemd section we apply a couple IPtables NAT rules required for SAP Datahub.
++
+----
+cd ${HOME}/sdh-${GUID}
+mv worker.ign worker.ign.dist
+jq '.storage = { "files": [ { "contents": { "source": "data:text/plain;charset=utf-8;base64,bmZzZAppcF90YWJsZXMKaXB0X1JFRElSRUNUCg==", "verification": { } }, "filesystem": "root", "mode": 420, "path": "/etc/modules-load.d/sap-datahub-dependencies.conf" } ] }' worker.ign.dist |\
+jq -c '.systemd = { "units": [ { "contents": "[Unit]\nDescription=Pre-load kernel modules for SAP Data Hub\nAfter=network.target\n\n[Service]\nType=simple\nExecStart=/usr/sbin/modprobe iptable_nat\nRestart=on-failure\nRestartSec=10\nRemainAfterExit=yes\n\n[Install]\nWantedBy=multi-user.target\n", "enabled": true, "name": "sdh-modules-load.service" } ] } '  > worker.ign
+----
++
+NOTE: -c in the jq command brings the output back in a single line, without -c its readable
+
+. Install cluster
++
+----
+openshift-install create cluster --dir $HOME/sdh-${GUID}
+----
+
+. verify that changes in worker.ign made it to the system:
+
+.. Verify that the compute nodes are of type `m4.2xlarge`:
++
+----
+oc get machines -n openshift-machine-api
+----
++
+sample output:
++
+----
+NAME                                        INSTANCE              STATE     TYPE         REGION         ZONE            AGE
+sdh-06d9-5p8xk-master-0                     i-0ba81e2443bd3c814   running   m4.xlarge    eu-central-1   eu-central-1a   30m
+sdh-06d9-5p8xk-master-1                     i-055033ff08f2323ad   running   m4.xlarge    eu-central-1   eu-central-1b   30m
+sdh-06d9-5p8xk-master-2                     i-02928115caba789c3   running   m4.xlarge    eu-central-1   eu-central-1c   30m
+sdh-06d9-5p8xk-worker-eu-central-1a-zk4sw   i-04099c8f7a803d5c3   running   m4.2xlarge   eu-central-1   eu-central-1a   29m
+sdh-06d9-5p8xk-worker-eu-central-1b-82wbq   i-0a4a1a504e723700c   running   m4.2xlarge   eu-central-1   eu-central-1b   29m
+sdh-06d9-5p8xk-worker-eu-central-1c-d99gn   i-000d45b2bac8faaa0   running   m4.2xlarge   eu-central-1   eu-central-1c   29m
+----
+
+.. Verify that the addional kernel modules are in `/etc/modules-load.d/sap-datahub-dependencies.conf` and the service `sdh-modules-load.service` are available on each worker node:
++
+----
+for worker in `oc get nodes  | awk '/worker/{print $1}'`; do
+    oc debug node/$worker -- chroot /host cat /etc/modules-load.d/sap-datahub-dependencies.conf
+     oc debug node/$worker -- chroot /host systemctl status sdh-modules-load.service
+ done
+----
++
+sample output:
++
+----
+Starting pod/ip-10-0-129-74eu-central-1computeinternal-debug ...
+To use host binaries, run `chroot /host`
+nfsd
+ip_tables
+ipt_REDIRECT
+
+Removing debug pod ...
+Starting pod/ip-10-0-129-74eu-central-1computeinternal-debug ...
+To use host binaries, run `chroot /host`
+● sdh-modules-load.service - Pre-load kernel modules for SAP Data Hub
+   Loaded: loaded (/etc/systemd/system/sdh-modules-load.service; enabled; vendor preset: enabled)
+   Active: active (exited) since Mon 2019-11-11 10:24:54 UTC; 27min ago
+  Process: 921 ExecStart=/usr/sbin/modprobe iptable_nat (code=exited, status=0/SUCCESS)
+ Main PID: 921 (code=exited, status=0/SUCCESS)
+      CPU: 10ms
+[...]
+----
+
+
+### Change the maximum number of PIDs per Container
+
+. Label the pool of worker nodes for use with SAP DataHub:
++
+----
+# oc label machineconfigpool/worker workload=sapdatahub
+----
+
+. Create the following ContainerRuntimeConfig resource.
++
+----
+# oc create -f - <<EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: ContainerRuntimeConfig
+metadata:
+ name: bumped-pid-limit
+spec:
+ machineConfigPoolSelector:
+   matchLabels:
+     workload: sapdatahub
+ containerRuntimeConfig:
+   pidsLimit: 4096
+EOF
+----
+
+. Wait until the machineconfigpool/worker becomes updated.
++
+----
+# watch oc get  machineconfigpool/worker
+NAME     CONFIG                                             UPDATED   UPDATING   DEGRADED
+worker   rendered-worker-8f91dd5fdd2f6c5555c405294ce5f83c   True      False      False
+----
+. Verify changed configuration with
++
+----
+for worker in `oc get nodes  | awk '/worker/{print $1}'`; do
+    oc debug node/$worker -- cat /host/etc/crio/crio.conf
+done | grep -i pids_limit
+----
+
+### Configure docker on jumphost
+
+. Install docker on Jumphost
++
+----
+sudo yum install docker
+----
+
+. start docker services
++
+----
+sudo systemctl enable docker
+sudo systemctl start docker
+----
+
+. Prepare docker for installation from user, i.e. make sure your jumphost user has root-access
++
+----
+sudo usermod -a -G dockerroot mkoch-redhat.com
+sudo chown root:dockerroot /var/run/docker.sock
+----
++
+CAUTION: `/var/run/docker.sock` will be `root:root` after restarting docker daemon. This is a default behaviour because every user of the group dockerroot can become root, by running a priviledged container accessing any root file.
+
+. Log out and back in again to activate the new group
+
+
+## Setup AWS ECR registry for use with SAP DataHub
+
+. Login to docker registry
++
+----
+sudo $(aws ecr get-login --no-include-email)
+----
+
+. store information in Variables
++
+----
+eval $(aws ecr get-login --no-include-email | awk '{ print ( "export DOCKER_LOGIN="$4 ); print ("export DOCKER_TOKEN="$6 ); sub ("^http[s]*://","",$7) ; print ("export DOCKER_REGISTRY="$7)}')
+----
+
+. create repositories for the docker images in AWS ECR
++
+AWS ECR requires a separate repository with the name of the image for each image before versions of the images can be pushed into AWS ECR
++
+.. create `setup-ecr.yml` with the following content
++
+----
+---
+- hosts: localhost
+  gather_facts: no
+  connection: local
+  tags: provisioning
+
+  vars:
+          aws_region: eu-central-1
+          repo_state: absent
+          ecr_sdh_repos:
+              - com.sap.bds.docker/storagegateway
+              - com.sap.datahub.linuxx86_64/app-base
+              - com.sap.datahub.linuxx86_64/auth-proxy
+              - com.sap.datahub.linuxx86_64/dq-integration
+              - com.sap.datahub.linuxx86_64/elasticsearch
+              - com.sap.datahub.linuxx86_64/flowagent-codegen
+              - com.sap.datahub.linuxx86_64/flowagent-operator
+              - com.sap.datahub.linuxx86_64/flowagent-service
+              - com.sap.datahub.linuxx86_64/fluentd
+              - com.sap.datahub.linuxx86_64/grafana
+              - com.sap.datahub.linuxx86_64/hello-sap
+              - com.sap.datahub.linuxx86_64/init-security
+              - com.sap.datahub.linuxx86_64/kibana
+              - com.sap.datahub.linuxx86_64/kube-state-metrics
+              - com.sap.datahub.linuxx86_64/nats
+              - com.sap.datahub.linuxx86_64/node-exporter
+              - com.sap.datahub.linuxx86_64/opensuse-leap
+              - com.sap.datahub.linuxx86_64/prometheus
+              - com.sap.datahub.linuxx86_64/pushgateway
+              - com.sap.datahub.linuxx86_64/security-operator
+              - com.sap.datahub.linuxx86_64/spark-datasourcedist
+              - com.sap.datahub.linuxx86_64/uaa
+              - com.sap.datahub.linuxx86_64/vflow-python36
+              - com.sap.datahub.linuxx86_64/vora-deployment-operator
+              - com.sap.datahub.linuxx86_64/vora-dqp
+              - com.sap.datahub.linuxx86_64/vora-dqp-textanalysis
+              - com.sap.datahub.linuxx86_64/vora-license-manager
+              - com.sap.datahub.linuxx86_64/vsolution-golang
+              - com.sap.datahub.linuxx86_64/vsolution-hana_replication
+              - com.sap.datahub.linuxx86_64/vsolution-ml-python
+              - com.sap.datahub.linuxx86_64/rbase
+              - com.sap.datahub.linuxx86_64/vsolution-sapjvm
+              - com.sap.datahub.linuxx86_64/vsolution-spark_on_k8s
+              - com.sap.datahub.linuxx86_64/vsolution-streaming
+              - com.sap.datahub.linuxx86_64/vsolution-textanalysis
+              - com.sap.datahub.linuxx86_64/vsystem
+              - com.sap.datahub.linuxx86_64/vsystem-auth
+              - com.sap.datahub.linuxx86_64/vsystem-hana-init
+              - com.sap.datahub.linuxx86_64/vsystem-module-loader
+              - com.sap.datahub.linuxx86_64/vsystem-shared-ui
+              - com.sap.datahub.linuxx86_64/vsystem-teardown
+              - com.sap.datahub.linuxx86_64/vsystem-ui
+              - com.sap.datahub.linuxx86_64/vsystem-voraadapter
+              - com.sap.datahub.linuxx86_64/vsystem-vrep
+              - com.sap.hana.container/base-opensuse42.3-amd64
+              - consul
+              - kaniko-project/executor
+              - com.sap.datahub.linuxx86_64/hana
+              - com.sap.datahub.linuxx86_64/sles
+              - com.sap.datahub.linuxx86_64/vsystem-vrep-csi
+              - com.sap.datahub.linuxx86_64/code-server
+              - com.sap.datahub.linuxx86_64/axino-service
+
+  tasks:
+     - name: Create SAP Datahub Repos
+       ecs_ecr:
+          name: "{{ item }}"
+          state: "{{repo_state}}"
+       with_items:  "{{ ecr_sdh_repos }}"
+----
++
+NOTE: If you want to use diffferent namespaces for Deployment and SAP Data Modeller follow the steps in the https://help.sap.com/viewer/e66c399612e84a83a8abe97c0eeb443a/2.7.latest/en-US/faff65095cbe44a1a783e6121e89f1df.html?q=aws%20ecr[SAP documentation]. This is strongly recommended for production environments, because diffrent instance may delete docker images in the registry unintendedly.
+
+.. Run the playbook
++
+----
+ansible-playbook setup-ecr.yml -e repo_state=present
+----
++
+
+
+### Install and Configure helm provisioning for SAP DataHub
+
+. Install helm client
++
+----
+# DESIRED_VERSION=v2.13.1
+# curl --silent https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get | \
+    DESIRED_VERSION="${DESIRED_VERSION:-v2.13.1}" bash
+----
++
+sample output:
+----
+Downloading https://get.helm.sh/helm-v2.13.1-linux-amd64.tar.gz
+Preparing to install helm and tiller into /usr/local/bin
+helm installed into /usr/local/bin/helm
+tiller installed into /usr/local/bin/tiller
+Run 'helm init' to configure helm.
+----
+
+. Create according service account
++
+----
+oc create sa -n kube-system tiller
+----
++
+sample output:
+----
+serviceaccount/tiller created
+----
+
+. Add policy:
++
+----
+oc adm policy add-cluster-role-to-user cluster-admin -n kube-system -z tiller
+----
++
+sample output:
++
+----
+clusterrole.rbac.authorization.k8s.io/cluster-admin added: "tiller"
+----
+
+. Initialize helm:
++
+----
+helm init --service-account=tiller --upgrade --wait
+----
++
+sample output:
++
+----
+Creating /home/mkoch-redhat.com/.helm
+Creating /home/mkoch-redhat.com/.helm/repository
+Creating /home/mkoch-redhat.com/.helm/repository/cache
+Creating /home/mkoch-redhat.com/.helm/repository/local
+Creating /home/mkoch-redhat.com/.helm/plugins
+Creating /home/mkoch-redhat.com/.helm/starters
+Creating /home/mkoch-redhat.com/.helm/cache/archive
+Creating /home/mkoch-redhat.com/.helm/repository/repositories.yaml
+Adding stable repo with URL: https://kubernetes-charts.storage.googleapis.com
+Adding local repo with URL: http://127.0.0.1:8879/charts
+$HELM_HOME has been configured at /home/mkoch-redhat.com/.helm.
+
+Tiller (the Helm server-side component) has been installed into your Kubernetes Cluster.
+
+Please note: by default, Tiller is deployed with an insecure 'allow unauthenticated users' policy.
+To prevent this, run `helm init` with the --tiller-tls-verify flag.
+For more information on securing your installation see: https://docs.helm.sh/using_helm/#securing-your-helm-installation
+Happy Helming!
+----
+
+. Check that the tiller pod is running:
+
+----
+$  oc get pods -n kube-system
+NAME                            READY   STATUS    RESTARTS   AGE
+tiller-deploy-dbb85cb99-szjtt   1/1     Running   0          3m59s
+----
+
+### Prepare project and priviledges for DataHub in OCP
+
+. Create Project for SAP DH
++
+----
+$  oc new-project sdh
+Now using project "sdh" on server "https://api.cluster-d217.sandbox1789.opentlc.com:6443".
+
+You can add applications to this project with the 'new-app' command. For example, try:
+
+    oc new-app django-psql-example
+
+to build a new example application in Python. Or use kubectl to deploy a simple Kubernetes application:
+
+    kubectl create deployment hello-node --image=gcr.io/hello-minikube-zero-install/hello-node
+----
+
+. Add required priviledges
++
+----
+oc adm policy add-scc-to-group anyuid "system:serviceaccounts:$(oc project -q)"
+oc adm policy add-scc-to-group hostmount-anyuid "system:serviceaccounts:$(oc project -q)"
+oc adm policy add-scc-to-user privileged -z "vora-vsystem-$(oc project -q)"
+oc adm policy add-scc-to-user privileged -z "$(oc project -q)-elasticsearch"
+oc adm policy add-scc-to-user privileged -z "$(oc project -q)-fluentd"
+oc adm policy add-scc-to-user privileged -z "default"
+oc adm policy add-scc-to-user privileged -z "vora-vflow-server"
+----
++
+New for SAP DH 2.7
++
+----
+oc adm policy add-scc-to-user hostaccess -z "$(oc project -q)-nodeexporter"
+oc adm policy add-scc-to-user privileged -z "vora-vsystem-$(oc project -q)-vrep"
+----
++
+sample output:
+----
+$ oc adm policy add-scc-to-group anyuid "system:serviceaccounts:$(oc project -q)"
+securitycontextconstraints.security.openshift.io/anyuid added to groups: ["system:serviceaccounts:sdh"]
+$ oc adm policy add-scc-to-group hostmount-anyuid "system:serviceaccounts:$(oc project -q)"
+securitycontextconstraints.security.openshift.io/hostmount-anyuid added to groups: ["system:serviceaccounts:sdh"]
+$ oc adm policy add-scc-to-user privileged -z "vora-vsystem-$(oc project -q)"
+securitycontextconstraints.security.openshift.io/privileged added to: ["system:serviceaccount:sdh:vora-vsystem-sdh"]
+$ oc adm policy add-scc-to-user privileged -z "$(oc project -q)-elasticsearch"
+securitycontextconstraints.security.openshift.io/privileged added to: ["system:serviceaccount:sdh:sdh-elasticsearch"]
+$ oc adm policy add-scc-to-user privileged -z "$(oc project -q)-fluentd"
+securitycontextconstraints.security.openshift.io/privileged added to: ["system:serviceaccount:sdh:sdh-fluentd"]
+$ oc adm policy add-scc-to-user privileged -z "default"
+securitycontextconstraints.security.openshift.io/privileged added to: ["system:serviceaccount:sdh:default"]
+$ oc adm policy add-scc-to-user privileged -z "vora-vflow-server"
+securitycontextconstraints.security.openshift.io/privileged added to: ["system:serviceaccount:sdh:vora-vflow-server"]
+----
+
+. As a cluster-admin, allow the project administrator to manage SDH custom resources.
++
+----
+# oc create -f - <<EOF
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: aggregate-sapvc-admin-edit
+  labels:
+    rbac.authorization.k8s.io/aggregate-to-admin: "true"
+    rbac.authorization.k8s.io/aggregate-to-edit: "true"
+rules:
+- apiGroups: ["sap.com"]
+  resources: ["voraclusters"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete", "deletecollection"]
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: aggregate-sapvc-view
+  labels:
+    # Add these permissions to the "view" default role.
+    rbac.authorization.k8s.io/aggregate-to-view: "true"
+rules:
+- apiGroups: ["sap.com"]
+  resources: ["voraclusters"]
+  verbs: ["get", "list", "watch"]
+EOF
+----
++
+sample output:
++
+----
+clusterrole.rbac.authorization.k8s.io/aggregate-sapvc-admin-edit created
+clusterrole.rbac.authorization.k8s.io/aggregate-sapvc-view created
+----
+
+### Deploy SDH observer
+
+SDH Observer is comtainer which patches datahub deployment contexts to run properly on OpenShift. It monitors the deployment and make the changes when appropriate.
+
+For more information see : https://access.redhat.com/articles/4324391#deploy-sdh-observer
+
+. Switch to project sdh:
++
+----
+oc status
+In project sdh on server https://api.cluster-d217.sandbox1789.opentlc.com:6443
+
+You have no services, deployment configs, or build configs.
+Run 'oc new-app' to create an application.
+----
+
++
+. Deploy SDH observer
++
+----
+OCPVER=4.2
+INSECURE_REGISTRY=false
+oc process -f https://raw.githubusercontent.com/miminar/sdh-helpers/master/sdh-observer.yaml \
+       NAMESPACE="$(oc project -q)" \
+       BASE_IMAGE_TAG="${OCPVER:-4.2}" \
+       MARK_REGISTRY_INSECURE=${INSECURE_REGISTRY:-0} | oc create -f -
+----
+
+## Install SAP Datahub
+
+For installing SAP DataHub you need your need your S-User account and password.
+
+. Download SAP DataHub binaries & unzip on jumphost
++
+.. Go to link:https://launchpad.support.sap.com/\#/softwarecenter/template/products/%20_APP=00200682500000001943&_EVENT=DISPHIER&HEADER=Y&FUNCTIONBAR=N&EVENT=TREE&NE=NAVIGATE&ENR=73554900100900002861&V=MAINT&TA=ACTUAL&PAGE=SEARCH/SAP%20DATA%20HUB%202[SAP Software Download Center], login with your SAP account and search for DATA HUB 2 or access this link:https://launchpad.support.sap.com/#/softwarecenter/search/DATA%20HUB%20-%20FOUNDATION[link].
+
+.. Download the SAP Data Hub Foundation file, for example: `DHFOUNDATION07_2-80004015.ZIP (SAP DATA HUB - FOUNDATION 2.7)``.
+
+.. Unpack the installer file and change to this directory. Type `install.sh -h` to verify the installer options
++
+----
+$ unzip DHFOUNDATION07_2-80004015.ZIP
+$ cd SAPDataHub-2.7.152-Foundation
+$ ./install.sh -h
+----
+
+. Set Environment Variables to define Namespace and verify docker registry
++
+-----
+echo $DOCKER_REGISTRY
+export NAMESPACE=sdh
+-----
+
+. Mirror the SDH images to the local registry
++
+On the local disk is not enough space to mirror everything so repeat the following steps until everything is uploaded:
+
+.. Preload images
++
+----
+$ ./install.sh -b -a
+----
++
+NOTE: if you receive an error with `no basic auth credentials` you may need to login to AWS ECR registry: `sudo $(aws ecr get-login --no-include-email)`
+
+////
+Unattended preload:
+
+./install.sh -a -b --sap-registry-login-type 2 --sap-registry-login-username '{{ SUSER }}' --sap-registry-login-password '{{ SUSER-PASSWORD }}'
+////
+
+.. It is possible to cleanup some images that are uploaded from time to time:
++
+----
+for i in $(docker images | awk '/'$DOCKER_REGISTRY'/ { print $1":"$2 }'); do  docker inspect $i  --format='{{.Size}} {{.RepoTags}}'; done | sort -n
+----
++
+take the largest image and make sure it is uploaded. Then remove it from the local disk:
++
+----
+docker rmi <names of largest image>
+----
+
+.. When the upload has stopped due to diskspace errors like
++
+----
+write /var/lib/docker/tmp/GetImageBlob391058538: no space left on device
+2019-11-08T14:48:30+0000 [ERROR] Image pulling failed, please see logs above!
+----
++
+delete all existing locally cached images and re-run the preload
++
+----
+$ docker rmi -f $(docker images | awk '{ print $3}' | uniq )
+$ ./install.sh -b -a
+----
++
+NOTE: This takes a couple of hours
+
+. Make sure that workers can access the ECR registry.
++
+To access the ECR Registry you have to attach a sufficent access policy to the worker role.
++
+----
+sdh_worker_role=$(aws iam list-instance-profiles | jq -r '.InstanceProfiles[] |
+          select(.InstanceProfileName | test("worker-profile")) | .Roles[] |
+          select(.RoleName | test("worker-role")) | "\(.RoleName)"')
+----
++
+Now check if the worker has the `AmazonEC2ContainerRegistryPowerUser` role attached:
++
+----
+aws iam list-attached-role-policies --role-name $sdh_worker_role
+{
+    "AttachedPolicies": [
+        {
+            "PolicyName": "AmazonEC2ContainerRegistryPowerUser",
+            "PolicyArn": "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser"
+        }
+    ]
+}
+----
++
+if you don't see the role, run:
++
+----
+ aws iam attach-role-policy --role-name $sdh_worker_role --policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser
+----
++
+////
+Now get the policy
++
+----
+$ aws iam get-role-policy --role-name sdh-06d9-5p8xk-worker-role --policy-name sdh-06d9-5p8xk-worker-policy
+{
+    "RoleName": "sdh-06d9-5p8xk-worker-role",
+    "PolicyDocument": {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Action": "ec2:Describe*",
+                "Resource": "*",
+                "Effect": "Allow"
+            }
+        ]
+    },
+    "PolicyName": "sdh-06d9-5p8xk-worker-policy"
+}
+----
++
+You need to change the policy to look like this:
++
+----
+{
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Action": "ec2:Describe*",
+                "Resource": "*",
+                "Effect": "Allow"
+            },
+            {
+                "Action": "ecr:*",
+                "Resource": "*",
+                "Effect": "Allow"
+            }
+        ]
+}
+----
++
+Apply policy with:
++
+----
+aws iam put-role-policy --role-name sdh-06d9-5p8xk-worker-role \
+    --policy-name sdh-06d9-5p8xk-worker-policy --policy-document  '{"Version":"2012-10-17","Statement":[{"Action":"ec2:Describe*","Resource":"*","Effect":"Allow"},{"Action":"ecr:*","Resource":"*","Effect":"Allow"}]}'
+----
+////
+
+. Figure out Installation parameters
++
+check storage class:
++
+----
+[mkoch-redhat.com@clientvm 1 ~]$ oc get storageclass
+NAME            PROVISIONER             AGE
+gp2 (default)   kubernetes.io/aws-ebs   2d22h
+----
++
+for Amazon EBS is fine.
++
+As we export the UI via Open Shift routes the name for the cert-domain is like this: `vsystem-\{namespace\}.\{wildcard_domain\}`, so in our case use `vsystem-sdh.apps.sdh-${GUID}.sandboxNNN.opentlc.com`
+
+. So the following parameters should used to kick-off installation
++
+----
+./install.sh -i -a --enable-kaniko=yes \
+  --pv-storage-class="gp2" \
+  --enable-kaniko=yes
+
+----
++
+////
+Unattended Install:
+
+./install.sh -a -i \
+    --pv-storage-class="gp2"\
+    --enable-kaniko=yes\
+    --vora-system-password 'R3dh4t1!' \
+    --vora-admin-username redhat \
+    --vora-admin-password 'R3dh4t1!' \
+    --enable-checkpoint-store no \
+    --cert-domain ${CERT_DOMAIN}
+    --vflow-image-pull-secret awsecr \
+    --image-pull-secret awsecr \
+    --vflow-aws-iam-role ${workerrole}
+////
++
+sample output log:
++
+----
+[...]
+
+No SSL certificate has been provided via the --provide-certs parameter. The SAP Data Hub installer will generate a self-signed certificate for TLS and JWT.
+Please enter the SAN (Subject Alternative Name) for the certificate, which must match the fully qualified domain name (FQDN) of the Kubernetes node to be accessed externally: vsystem-sdh.apps.cluster-d217.sandbox1789.opentlc.com
+
+
+SAP Data Hub System Tenant Administrator Credentials
+Provide a password for the "system" user of "system" tenant.
+The password must have 8-255 characters and must contain lower case, upper case, numerical and on of the following special characters . @ # $ %% * + _ ? ! It cannot contain spaces.
+
+Please enter a password for "system" user of "system" tenant: R3dh4t1!
+Please reenter your password:
+
+SAP Dat Hub Initial Tenant Administrator Credentials
+Provide a username and password for administrator user of "default" tenant.
+The username must have at least 4 and at most 60 characters
+Allowed characters: alphabetic(only lowercase), digits and hyphens
+Username is not allowed to begin/end with hyphens and cannot contain multiple consecutive hyphens
+
+Please enter a username for default tenant: redhat
+Do you want to use the same "system" user password for "redhat" user of "default" tenant? (yes/no) yes
+Do you want to configure security contexts for Hadoop/Kerberized Hadoop? (yes/no) no
+2019-11-07T11:56:05+0000 [INFO] Configuring contexts with: python2.7 configure_contexts.py -a -n --set Vora_JWT_Issuer_NI.default --set Vora_Default_TLS_Configuration_NI.default
+secret/vora.conf.secop.contexts created
+secret/vora.conf.secop.contexts labeled
+2019-11-07T11:56:06+0000 [INFO] Vora streaming tables require Vora's checkpoint store\n
+Enable Vora checkpoint store? (yes/no) yes
+Please provide the following parameters for Vora's checkpoint store
+Please enter type of shared storage (s3/wasb/gcs/webhdfs): s3
+Please provide the following parameters for Vora's checkpoint store
+Please enter type of shared storage (s3/wasb/gcs/webhdfs): s3
+Please enter S3 access key:
+Please enter S3 secret access key:
+Please enter S3 host (empty for default 'https://s3.amazonaws.com'):
+Please enter S3 region you want to connect to (empty for default 'us-east-1'): eu-central-1
+Please enter connection timeout in seconds (empty for default 180):
+Please enter S3 bucket and directory (in the form my-bucket/directory): sdh-d217/
+Do you want to validate the checkpoint store? (yes/no) no
+#
+###### Configuration Summary #######
+installer:
+  ASK_FOR_CERTS: ''
+  AUDITLOG_MODE: production
+  CERT_DOMAIN: vsystem-sdh.apps.cluster-d217.sandbox1789.opentlc.com
+  CHECKPOINT_STORE_TYPE: ''
+  CHECKPOINT_STORE_TYPE_RAW: ''
+  CLUSTER_HTTPS_PROXY: ''
+  CLUSTER_HTTP_PROXY: ''
+  CLUSTER_NO_PROXY: ''
+  CONSUL_STORAGE_CLASS: ''
+  CUSTOM_DOCKER_LOG_PATH: ''
+  DIAGNOSTIC_STORAGE_CLASS: ''
+  DISABLE_INSTALLER_LOGGING: ''
+  DISK_STORAGE_CLASS: ''
+  DLOG_STORAGE_CLASS: ''
+  DOCKER_REGISTRY: 126521742790.dkr.ecr.eu-central-1.amazonaws.com
+  ENABLE_CHECKPOINT_STORE: 'false'
+  ENABLE_DIAGNOSTIC_PERSISTENCY: 'yes'
+  ENABLE_DQP_ANTIAFFINITY: 'yes'
+  ENABLE_KANIKO: 'yes'
+  ENABLE_NETWORK_POLICIES: 'no'
+  ENABLE_RBAC: 'yes'
+  HANA_STORAGE_CLASS: ''
+  IMAGE_PULL_SECRET: ''
+  PACKAGE_VERSION: 2.6.102
+  PV_STORAGE_CLASS: ''
+  TILLER_NAMESPACE: ''
+  USE_K8S_DISCOVERY: 'yes'
+  VALIDATE_CHECKPOINT_STORE: ''
+  VFLOW_AWS_IAM_ROLE: ''
+  VFLOW_IMAGE_PULL_SECRET: ''
+  VFLOW_REGISTRY: 126521742790.dkr.ecr.eu-central-1.amazonaws.com
+  VORA_ADMIN_USERNAME: redhat
+  VORA_FLAVOR: ''
+  VORA_VSYSTEM_DEFAULT_TENANT_NAME: default
+  VSYSTEM_LOAD_NFS_MODULES: 'yes'
+  VSYSTEM_STORAGE_CLASS: ''
+######################################
+
+[...]
+----
+
+. While the installation is running watch all pods coming up without
++
+----
+oc get pods --namespace=sdh -w
+----
+
+. Test cluster health using Helm test:
++
+----
+  $ helm test <watch out put from installer>
+----
+
+. (Optional) Manually confirm consul cluster is healthy.
+----
+kubectl exec vora-consul-0 consul members --namespace=sdh | grep server
+----
+
+### Post Installation tasks
+
+#### Expose  SDH services externally
+OpenShift allows you to access the Data Hub services via routes as opposed to regular NodePorts. For example, instead of accessing the vsystem service via `https://master-node.example.com:32322`, after the service exposure, you will be able to access it at `https://vsystem-sdh.wildcard-domain`. This is an alternative to the official guide documentation to Expose the Service From Outside the Network.
+
+. Look up the `vsystem` service:
++
+----
+# oc project sdh            # switch to the Data Hub project
+# oc get services | grep "vsystem "
+vsystem   ClusterIP   172.30.227.186   <none>   8797/TCP   19h
+----
+
+. create the route
++
+----
+# oc create route passthrough --service=vsystem
+# oc get route
+NAME      HOST/PORT                     PATH  SERVICES  PORT      TERMINATION  WILDCARD
+vsystem   vsystem-sdh.wildcard-domain         vsystem   vsystem   passthrough  None
+----
+
+. (Optional) Expose the SAP Vora Transaction Coordinator for external access:
++
+----
+# oc create route passthrough --service=vora-tx-coordinator-ext
+# oc get route
+NAME                     HOST/PORT                                    PATH  SERVICES                 PORT      TERMINATION  WILDCARD
+vora-tx-coordinator-ext  vora-tx-coordinator-ext-sdh.wildcard-domain        vora-tx-coordinator-ext  tc-ext    passthrough  None
+vsystem                  vsystem-sdh.wildcard-domain                        vsystem                  vsystem   passthrough  None
+----
+
+NOTE: if you want to create a different hostname instead of the auto-generated use the option `--hostname=vora-tx-coordinator.wildcard-domain`
+
+. (Optional) Expose the SAP HANA Wire for external access
++
+----
+# oc create route passthrough --service=vora-tx-coordinator-ext --port=hana-wire --dry-run -o yaml | \
+    oc patch -o yaml --local -p '{"metadata":{"name":"hana-wire"}}' -f - | oc create -f -
+# oc get route
+NAME                     HOST/PORT                                    PATH  SERVICES                 PORT       TERMINATION  WILDCARD
+hana-wire                hana-wire-sdh.wildcard-domain                      vora-tx-coordinator-ext  hana-wire  passthrough  None
+vora-tx-coordinator-ext  vora-tx-coordinator-ext-sdh.wildcard-domain        vora-tx-coordinator-ext  tc-ext     passthrough  None
+vsystem                  vsystem-sdh.wildcard-domain                        vsystem                  vsystem    passthrough  None
+----
+
+You can now access the SDH web console at https://vsystem-sdh.wildcard-domain
+
+NOTE: Exposing via NodePorts is possible, too, but for OpenShift exposure using routes is preferred
+
+### Configure Modeller to properly use AWS ECR registry
+
+SAP Data Hub installer allows to specify "AWS IAM Role for Pipeline Modeler" when AWS ECR Registry is used as the external registry. However, due to a bug in Data Hub, the Modeler cannot use it. In order to use AWS ECR Registry for Data Hub, one can follow the instructions at link:https://help.sap.com/viewer/e66c399612e84a83a8abe97c0eeb443a/2.6.latest/en-US/a1cbbc0acc834c0cbbe443f2e0d63ab9.html[Provide Access Credentials for a Password Protected Container Registry] by using the AWS_ACCESS_KEY as user and the AWS_SECRET_KEY as password:
+
+. Create a secret in DataHub
+.. create the following secret file with AWS credentials:
++
+----
+# cat >/tmp/vsystem-registry-secret.txt <<EOF
+username: "$AWS_ACCESS_KEY"
+password: "$AWS_SECRET_KEY"
+EOF
+----
++
+NOTE: The quotes around user and password are important
+
+.. Log in to SAP Datahub (https://vsystem-sdh.apps.sdh-${GUID}.sandboxNNN.opentlc.com/) with tenant "default" and user and password you chose during installation
+.. click the *System Managemt* tile
+.. click the *Application Configuration & Secrets* button above the search bar.
+.. Click the *Secrets* tab, and then click the *Create* icon.
+.. For the secret name, enter `vflow-registry`.
+.. Browse to select and upload the secret file `vsystem-registry-secret.txt` that you previously created.
+.. Click *Create*.
+
+. Apply the newly created secret to the application configuration:
+.. To open the configuration settings, click the *Application Configuration & Secrets* button above the search bar.
+.. In the *Configuration* tab, find the following parameter: `Modeler: Name of the vSystem secret containing the credentials for Docker registry`.
+.. Enter `vflow-registry`, which is the name of the secret that you previously created.
+
+. In SAP Data Hub System Management, start the *Modeler* application:
+.. Launch the SAP Data Hub System Management application and open the *Applications* tab.
+.. Select the *Modeler* application in the left pane, and click the *Create an Application button* in the upper right.
+
+
+
+### Verify Installation
+https://help.sap.com/viewer/e66c399612e84a83a8abe97c0eeb443a/2.6.latest/en-US/1551785f3d7e4d37af7fe99185f7acb6.html
+
+## Clean Up Environment
+To clean up the environment, do the following:
+
+. Log in to your bastion VM.
+
+// TODO: Add to the playbook
+. cleanup AWS registry
+
+.. Delete all images from registry by running the following shell script
++
+----
+!/bin/bash
+
+for r in $(aws ecr describe-repositories | awk '/repositoryName/ {print $2}' | tr -d '\",'); do
+ echo "Cleaning up repository $r"
+ for i in $(aws ecr list-images --repository-name $r | awk '/imageDigest/ {print $2}' | tr -d '\",'); do
+  set -x
+  aws ecr batch-delete-image --repository-name $r --image-ids imageDigest=$i
+  set +x
+ done
+done
+----
+
+.. delete the repositories from the registry
++
+----
+# ansible-playbook setup-ecr.yml -e repo_state=absent
+----
+
+.. delete ECR policy from worker nodes
++
+----
+aws iam detach-role-policy --role-name sdh-fb46-vkszx-worker-role --policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser
+----
+. Delete the cluster:
++
+----
+openshift-install destroy cluster --dir=${HOME}/sdh-${GUID}
+----
+
+. Delete all of the files created by the OpenShift installer:
++
+----
+rm -rf ${HOME}/.kube
+rm -rf ${HOME}/sdh-${GUID}
+----
+
+Delete your environment from https://labs.opentlc.com.
+
+This concludes the SAP DataHub lab.
+
+
+## Apendix
+[1] https://cloud-gc.readthedocs.io/en/latest/chapter03_advanced-tutorial/iam-role.html#grant-s3-permission-to-ec2

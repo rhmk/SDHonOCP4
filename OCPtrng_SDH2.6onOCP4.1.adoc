@@ -66,6 +66,8 @@ Red Hat Enterprise Linux Server release 7.6 (Maipo)
   "architecture" : "x86_64",
   "instanceType" : "t2.large"
 ----
++
+NOTE: Make note of the region, in this case `eu-west-1`
 
 . Download AWS Cli for verification
 +
@@ -117,7 +119,7 @@ exit
 cat > credentials << EOT
 export AWS_ACCESS_KEY="<YOURACCESSKEY>"
 export AWS_SECRET_KEY="<YOURSECRETKEY>"
-export REGION=us-east-2
+export REGION=<take region from step (4)>
 EOT
 
 . ./credentials
@@ -1098,8 +1100,8 @@ Please provide the following parameters for Vora's checkpoint store
 Please enter type of shared storage (s3/wasb/gcs/webhdfs): s3
 Please provide the following parameters for Vora's checkpoint store
 Please enter type of shared storage (s3/wasb/gcs/webhdfs): s3
-Please enter S3 access key: 
-Please enter S3 secret access key: 
+Please enter S3 access key:
+Please enter S3 secret access key:
 Please enter S3 host (empty for default 'https://s3.amazonaws.com'):
 Please enter S3 region you want to connect to (empty for default 'us-east-1'): eu-central-1
 Please enter connection timeout in seconds (empty for default 180):
@@ -1232,8 +1234,9 @@ EOF
 +
 NOTE: The quotes around user and password are important
 
-
-.. In SAP Data Hub System Management (https://vsystem-sdh.apps.sdh-${GUID}.sandboxNNN.opentlc.com/), click the *Application Configuration & Secrets* button above the search bar.
+.. Log in to SAP Datahub (https://vsystem-sdh.apps.sdh-${GUID}.sandboxNNN.opentlc.com/) with tenant "default" and user and password you chose during installation
+.. click the *System Managemt* tile
+.. click the *Application Configuration & Secrets* button above the search bar.
 .. Click the *Secrets* tab, and then click the *Create* icon.
 .. For the secret name, enter `vflow-registry`.
 .. Browse to select and upload the secret file `vsystem-registry-secret.txt` that you previously created.

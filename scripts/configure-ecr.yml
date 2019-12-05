@@ -1,0 +1,83 @@
+---
+- hosts: localhost
+  gather_facts: no
+  connection: local
+  tags: provisioning
+
+  vars:
+          aws_region: eu-central-1
+          repo_state: present
+          ecr_sdh_repos:
+              - com.sap.bds.docker/storagegateway
+              - com.sap.datahub.linuxx86_64/app-base
+              - com.sap.datahub.linuxx86_64/auth-proxy
+              - com.sap.datahub.linuxx86_64/dq-integration
+              - com.sap.datahub.linuxx86_64/elasticsearch
+              - com.sap.datahub.linuxx86_64/flowagent-codegen
+              - com.sap.datahub.linuxx86_64/flowagent-operator
+              - com.sap.datahub.linuxx86_64/flowagent-service
+              - com.sap.datahub.linuxx86_64/fluentd
+              - com.sap.datahub.linuxx86_64/grafana
+              - com.sap.datahub.linuxx86_64/hello-sap
+              - com.sap.datahub.linuxx86_64/init-security
+              - com.sap.datahub.linuxx86_64/kibana
+              - com.sap.datahub.linuxx86_64/kube-state-metrics
+              - com.sap.datahub.linuxx86_64/nats
+              - com.sap.datahub.linuxx86_64/node-exporter
+              - com.sap.datahub.linuxx86_64/opensuse-leap
+              - com.sap.datahub.linuxx86_64/prometheus
+              - com.sap.datahub.linuxx86_64/pushgateway
+              - com.sap.datahub.linuxx86_64/security-operator
+              - com.sap.datahub.linuxx86_64/spark-datasourcedist
+              - com.sap.datahub.linuxx86_64/uaa
+              - com.sap.datahub.linuxx86_64/vflow-python36
+              - com.sap.datahub.linuxx86_64/vora-deployment-operator
+              - com.sap.datahub.linuxx86_64/vora-dqp
+              - com.sap.datahub.linuxx86_64/vora-dqp-textanalysis
+              - com.sap.datahub.linuxx86_64/vora-license-manager
+              - com.sap.datahub.linuxx86_64/vsolution-golang
+              - com.sap.datahub.linuxx86_64/vsolution-hana_replication
+              - com.sap.datahub.linuxx86_64/vsolution-ml-python
+              - com.sap.datahub.linuxx86_64/rbase
+              - com.sap.datahub.linuxx86_64/vsolution-sapjvm
+              - com.sap.datahub.linuxx86_64/vsolution-spark_on_k8s
+              - com.sap.datahub.linuxx86_64/vsolution-streaming
+              - com.sap.datahub.linuxx86_64/vsolution-textanalysis
+              - com.sap.datahub.linuxx86_64/vsystem
+              - com.sap.datahub.linuxx86_64/vsystem-auth
+              - com.sap.datahub.linuxx86_64/vsystem-hana-init
+              - com.sap.datahub.linuxx86_64/vsystem-module-loader
+              - com.sap.datahub.linuxx86_64/vsystem-shared-ui
+              - com.sap.datahub.linuxx86_64/vsystem-teardown
+              - com.sap.datahub.linuxx86_64/vsystem-ui
+              - com.sap.datahub.linuxx86_64/vsystem-voraadapter
+              - com.sap.datahub.linuxx86_64/vsystem-vrep
+              - com.sap.hana.container/base-opensuse42.3-amd64
+              - consul
+              - kaniko-project/executor
+              - com.sap.datahub.linuxx86_64/hana
+              - com.sap.datahub.linuxx86_64/sles
+              - com.sap.datahub.linuxx86_64/vsystem-vrep-csi
+              - com.sap.datahub.linuxx86_64/code-server
+              - com.sap.datahub.linuxx86_64/axino-service
+
+  tasks:
+     - name: Remove all Images from registry
+       shell: |
+            LANG=C
+            $(aws ecr get-login --no-include-email)
+            for r in $(aws ecr describe-repositories | awk '/repositoryName/ {print $2}' | tr -d '\",'); do
+                   echo "Cleaning up repository $r"
+                   for i in $(aws ecr list-images --repository-name $r | awk '/imageDigest/ {print $2}' | tr -d '\",'); do
+                         aws ecr batch-delete-image --repository-name $r --image-ids imageDigest=$i
+                   done
+            done
+       when: repo_state=abesent
+
+     - name: Ensure SAP Datahub Repos are "{{ repo_state }}"
+       ecs_ecr:
+          name: "{{ item }}"
+          state: "{{repo_state}}"
+       with_items:  "{{ ecr_sdh_repos }}
+
+
