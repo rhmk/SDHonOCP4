@@ -78,6 +78,4 @@
        ecs_ecr:
           name: "{{ item }}"
           state: "{{repo_state}}"
-       with_items:  "{{ ecr_sdh_repos }}
-
-
+       with_items:  "{{ ecr_sdh_repos }}"
