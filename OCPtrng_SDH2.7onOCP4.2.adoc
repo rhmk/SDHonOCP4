@@ -382,7 +382,7 @@ CAUTION: `/var/run/docker.sock` will be `root:root` after restarting docker daem
 . Login to docker registry
 +
 ----
-sudo $(aws ecr get-login --no-include-email)
+eval $(aws ecr get-login --no-include-email)
 ----
 
 . store information in Variables
@@ -712,7 +712,7 @@ On the local disk is not enough space to mirror everything so repeat the followi
 $ ./install.sh -b -a
 ----
 +
-NOTE: if you receive an error with `no basic auth credentials` you may need to login to AWS ECR registry: `sudo $(aws ecr get-login --no-include-email)`
+NOTE: if you receive an error with `no basic auth credentials` you may need to login to AWS ECR registry: `eval $(aws ecr get-login --no-include-email)`
 
 ////
 Unattended preload:
