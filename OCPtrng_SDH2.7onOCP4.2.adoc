@@ -845,9 +845,7 @@ As we export the UI via Open Shift routes the name for the cert-domain is like t
 +
 ----
 ./install.sh -i -a --enable-kaniko=yes \
-  --pv-storage-class="gp2" \
-  --enable-kaniko=yes
-
+  --pv-storage-class="gp2" 
 ----
 +
 ////
@@ -951,16 +949,16 @@ installer:
 [...]
 ----
 
-. While the installation is running watch all pods coming up without
+. While the installation is running watch all pods coming up with
 +
 ----
 oc get pods --namespace=sdh -w
 ----
 
-. Test cluster health using Helm test:
+. Test cluster health using Helm test (info is printed by installer):
 +
 ----
-  $ helm test <watch out put from installer>
+  $ helm test <watch and use output from installer>
 ----
 
 . (Optional) Manually confirm consul cluster is healthy.
@@ -1108,5 +1106,5 @@ Delete your environment from https://labs.opentlc.com.
 This concludes the SAP DataHub lab.
 
 
-## Apendix
+## Appendix
 [1] https://cloud-gc.readthedocs.io/en/latest/chapter03_advanced-tutorial/iam-role.html#grant-s3-permission-to-ec2
