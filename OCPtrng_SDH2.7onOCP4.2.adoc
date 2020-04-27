@@ -13,7 +13,7 @@ Services → Catalogs → All Services → OPENTLC OpenShift 4 Labs → OpenShif
 
 You will get an email with your GUID and your sandbox domain:
 
- - GUID. 4char
+ - GUID: 4char
  - toplevel domain: .sandboxNNN.opentlc.com
  - AWS access Credentials
  - bastion host with password
