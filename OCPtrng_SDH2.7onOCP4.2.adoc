@@ -71,7 +71,7 @@ Now install the following packages:
  sudo yum -y install python2-boto python2-boto3 jq docker
 ----
 +
-WARN: Please check that all packages are installed
+WARNING: Please check that all packages are installed
 
 . Check your host
 +
