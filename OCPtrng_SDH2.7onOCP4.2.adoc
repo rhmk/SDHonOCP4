@@ -39,9 +39,39 @@ NOTE: You can also reboot at the end of the setup
 
 . Install the following packages
 +
+Some of these packages are available in the EPEL repository, which is replicated in this environemnt.
+Please make sure EPEL in your repository list. 
++ 
+----
+# sudo yum repolist
+Loaded plugins: amazon-id, product-id, rhui-lb, search-disabled-repos, subscription-manager
+This system is not registered with an entitlement server. You can use subscription-manager to register.
+repo id                                                                    repo name                                                                                   status
+ansible-tower-cli/x86_64                                                   Ansible Tower CLI Repository - EL7 x86_64                                                      337
+ansible-tower-cli-dependencies/x86_64                                      Ansible Tower CLI Dependencies Repository - EL7 x86_64                                          61
+epel                                                                       epel                                                                                        13.343
+rhel-7-server-ansible-2.7-rpms                                             rhel-7-server-ansible-2.7-rpms                                                                  21
+rhel-7-server-extras-rpms                                                  rhel-7-server-extras-rpms                                                                    1.229
+rhel-7-server-optional-rpms                                                rhel-7-server-optional-rpms                                                                 19.636
+rhel-7-server-rpms                                                         rhel-7-server-rpms          
+----
++ 
+if epel is not in this list, run the following commands and try again:
++
+----
+$ sudo -i
+# cd /etc/yum.repos.d/
+# fgrep -A4 '[rhel-7-server-rpms]' open_ocp4-ha-lab.repo | sed  's/rhel-7-server-rpms/epel/g' >> open_ocp4-ha-lab.repo
+# yum clean all & yum repolist
+----
++
+Now install the following packages:
++
 ----
  sudo yum -y install python2-boto python2-boto3 jq docker
 ----
++
+WARN: Please check that all packages are installed
 
 . Check your host
 +
