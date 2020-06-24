@@ -56,7 +56,7 @@ rhel-7-server-optional-rpms                                                rhel-
 rhel-7-server-rpms                                                         rhel-7-server-rpms          
 ----
 + 
-if epel is not in this list, run the following commands and try again:
+if `epel` is not in this list, run the following commands and try again:
 +
 ----
 $ sudo -i
