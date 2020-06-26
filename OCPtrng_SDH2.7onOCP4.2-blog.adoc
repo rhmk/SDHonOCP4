@@ -13,7 +13,7 @@ Services → Catalogs → All Services → OPENTLC OpenShift 4 Labs → OpenShif
 
 You will get an email with your GUID and your sandbox domain:
 
- - GUID: 4char
+ - GUID. 4char
  - toplevel domain: .sandboxNNN.opentlc.com
  - AWS access Credentials
  - bastion host with password
@@ -39,39 +39,9 @@ NOTE: You can also reboot at the end of the setup
 
 . Install the following packages
 +
-Some of these packages are available in the EPEL repository, which is replicated in this environemnt.
-Please make sure EPEL in your repository list. 
-+ 
-----
-# sudo yum repolist
-Loaded plugins: amazon-id, product-id, rhui-lb, search-disabled-repos, subscription-manager
-This system is not registered with an entitlement server. You can use subscription-manager to register.
-repo id                                                                    repo name                                                                                   status
-ansible-tower-cli/x86_64                                                   Ansible Tower CLI Repository - EL7 x86_64                                                      337
-ansible-tower-cli-dependencies/x86_64                                      Ansible Tower CLI Dependencies Repository - EL7 x86_64                                          61
-epel                                                                       epel                                                                                        13.343
-rhel-7-server-ansible-2.7-rpms                                             rhel-7-server-ansible-2.7-rpms                                                                  21
-rhel-7-server-extras-rpms                                                  rhel-7-server-extras-rpms                                                                    1.229
-rhel-7-server-optional-rpms                                                rhel-7-server-optional-rpms                                                                 19.636
-rhel-7-server-rpms                                                         rhel-7-server-rpms          
-----
-+ 
-if `epel` is not in this list, run the following commands and try again:
-+
-----
-$ sudo -i
-# cd /etc/yum.repos.d/
-# fgrep -A4 '[rhel-7-server-rpms]' open_ocp4-ha-lab.repo | sed  's/rhel-7-server-rpms/epel/g' >> open_ocp4-ha-lab.repo
-# yum clean all & yum repolist
-----
-+
-Now install the following packages:
-+
 ----
  sudo yum -y install python2-boto python2-boto3 jq docker
 ----
-+
-WARNING: Please check that all packages are installed
 
 . Check your host
 +
@@ -412,7 +382,7 @@ CAUTION: `/var/run/docker.sock` will be `root:root` after restarting docker daem
 . Login to docker registry
 +
 ----
-eval $(aws ecr get-login --no-include-email)
+sudo $(aws ecr get-login --no-include-email)
 ----
 
 . store information in Variables
@@ -742,7 +712,7 @@ On the local disk is not enough space to mirror everything so repeat the followi
 $ ./install.sh -b -a
 ----
 +
-NOTE: if you receive an error with `no basic auth credentials` you may need to login to AWS ECR registry: `eval $(aws ecr get-login --no-include-email)`
+NOTE: if you receive an error with `no basic auth credentials` you may need to login to AWS ECR registry: `sudo $(aws ecr get-login --no-include-email)`
 
 ////
 Unattended preload:
@@ -875,7 +845,9 @@ As we export the UI via Open Shift routes the name for the cert-domain is like t
 +
 ----
 ./install.sh -i -a --enable-kaniko=yes \
-  --pv-storage-class="gp2" 
+  --pv-storage-class="gp2" \
+  --enable-kaniko=yes
+
 ----
 +
 ////
@@ -979,16 +951,16 @@ installer:
 [...]
 ----
 
-. While the installation is running watch all pods coming up with
+. While the installation is running watch all pods coming up without
 +
 ----
 oc get pods --namespace=sdh -w
 ----
 
-. Test cluster health using Helm test (info is printed by installer):
+. Test cluster health using Helm test:
 +
 ----
-  $ helm test <watch and use output from installer>
+  $ helm test <watch out put from installer>
 ----
 
 . (Optional) Manually confirm consul cluster is healthy.
@@ -1136,5 +1108,5 @@ Delete your environment from https://labs.opentlc.com.
 This concludes the SAP DataHub lab.
 
 
-## Appendix
+## Apendix
 [1] https://cloud-gc.readthedocs.io/en/latest/chapter03_advanced-tutorial/iam-role.html#grant-s3-permission-to-ec2
