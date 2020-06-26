@@ -40,8 +40,8 @@ NOTE: You can also reboot at the end of the setup
 . Install the following packages
 +
 Some of these packages are available in the EPEL repository, which is replicated in this environemnt.
-Please make sure EPEL in your repository list. 
-+ 
+Please make sure EPEL in your repository list.
++
 ----
 # sudo yum repolist
 Loaded plugins: amazon-id, product-id, rhui-lb, search-disabled-repos, subscription-manager
@@ -53,9 +53,9 @@ epel                                                                       epel 
 rhel-7-server-ansible-2.7-rpms                                             rhel-7-server-ansible-2.7-rpms                                                                  21
 rhel-7-server-extras-rpms                                                  rhel-7-server-extras-rpms                                                                    1.229
 rhel-7-server-optional-rpms                                                rhel-7-server-optional-rpms                                                                 19.636
-rhel-7-server-rpms                                                         rhel-7-server-rpms          
+rhel-7-server-rpms                                                         rhel-7-server-rpms
 ----
-+ 
++
 if epel is not in this list, run the following commands and try again:
 +
 ----
@@ -873,26 +873,27 @@ As we export the UI via Open Shift routes the name for the cert-domain is like t
 
 . So the following parameters should used to kick-off installation
 +
+CAUTION: Please do not use checkpoint store in the installation. To use
+checkpoint store you need to create an S3 storage bucket and assign access to the S3 storage as
+described in the apendix to all cluster nodes including the bastion host (for checking)
++
 ----
 ./install.sh -i -a --enable-kaniko=yes \
-  --pv-storage-class="gp2" 
+  --pv-storage-class="gp2"
 ----
 +
-////
-Unattended Install:
-
+for an unattended install you can type something similar to this:
++
+----
 ./install.sh -a -i \
     --pv-storage-class="gp2"\
     --enable-kaniko=yes\
-    --vora-system-password 'R3dh4t1!' \
+    --vora-system-password 'MyPassw0rd!' \
     --vora-admin-username redhat \
-    --vora-admin-password 'R3dh4t1!' \
+    --vora-admin-password 'MyPassw0rd!' \
     --enable-checkpoint-store no \
     --cert-domain ${CERT_DOMAIN}
-    --vflow-image-pull-secret awsecr \
-    --image-pull-secret awsecr \
-    --vflow-aws-iam-role ${workerrole}
-////
+----
 +
 sample output log:
 +
@@ -923,19 +924,7 @@ Do you want to configure security contexts for Hadoop/Kerberized Hadoop? (yes/no
 secret/vora.conf.secop.contexts created
 secret/vora.conf.secop.contexts labeled
 2019-11-07T11:56:06+0000 [INFO] Vora streaming tables require Vora's checkpoint store\n
-Enable Vora checkpoint store? (yes/no) yes
-Please provide the following parameters for Vora's checkpoint store
-Please enter type of shared storage (s3/wasb/gcs/webhdfs): s3
-Please provide the following parameters for Vora's checkpoint store
-Please enter type of shared storage (s3/wasb/gcs/webhdfs): s3
-Please enter S3 access key:
-Please enter S3 secret access key:
-Please enter S3 host (empty for default 'https://s3.amazonaws.com'):
-Please enter S3 region you want to connect to (empty for default 'us-east-1'): eu-central-1
-Please enter connection timeout in seconds (empty for default 180):
-Please enter S3 bucket and directory (in the form my-bucket/directory): sdh-d217/
-Do you want to validate the checkpoint store? (yes/no) no
-#
+Enable Vora checkpoint store? (yes/no) no
 ###### Configuration Summary #######
 installer:
   ASK_FOR_CERTS: ''
