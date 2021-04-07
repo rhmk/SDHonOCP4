@@ -1,8 +1,8 @@
 #!/usr/bin/bash
-
-# CHECK OCP
-
-for worker in `oc get nodes|awk '/sdi-worker/{print $1}'`; do
+ 
+# CHECK OCP (Note Files may change after update)
+ 
+for worker in `oc get nodes|awk '/worker/{print $1}'`; do
   echo "Checking node $worker ------------------------------------------------------------------------------"
   # Check for additional kernelmodules
   oc debug node/$worker -- chroot /host cat /etc/crio/crio.conf.d/90-default-capabilities  2> /dev/null
@@ -14,9 +14,3 @@ for worker in `oc get nodes|awk '/sdi-worker/{print $1}'`; do
   oc debug node/$worker -- chroot /host cat /etc/crio/crio.conf.d/01-ctrcfg-pidsLimit
   echo "--------------------------------------------------------------------------------------------------------"
 done
-
-
-
-# Check Storage
-
-

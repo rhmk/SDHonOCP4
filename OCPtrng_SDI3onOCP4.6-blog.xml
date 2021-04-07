@@ -1,0 +1,1132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?asciidoc-toc?>
+<?asciidoc-numbered?>
+<article xmlns="http://docbook.org/ns/docbook" xmlns:xl="http://www.w3.org/1999/xlink" version="5.0" xml:lang="en">
+<info>
+<title>SAP Data Intelligence installation</title>
+<date>2021-02-07</date>
+</info>
+<section xml:id="_prerequisites">
+<title>prerequisites</title>
+<simpara>To install SAP Data Intelligence (SDI) you should have prepared the following</simpara>
+<itemizedlist>
+<listitem>
+<simpara>A running Openshift Cluster with at least</simpara>
+<itemizedlist>
+<listitem>
+<simpara>3 master nodes</simpara>
+</listitem>
+<listitem>
+<simpara>3 worker nodes for SDI with minimum requirements</simpara>
+</listitem>
+<listitem>
+<simpara>3 worker nodes with OCS storage (optional AWS S3 storage)</simpara>
+</listitem>
+</itemizedlist>
+</listitem>
+<listitem>
+<simpara>Your SAP S-User data for downloading the software</simpara>
+</listitem>
+<listitem>
+<simpara>A management node/jumphost to access the Openshift Cluster</simpara>
+</listitem>
+</itemizedlist>
+<note>
+<simpara>This document assumes direct internet access from the OpenShift Cluster. For different
+setups please see the complete Knowledgebase article at <link xl:href="https://access.redhat.com/articles/5100521">https://access.redhat.com/articles/5100521</link></simpara>
+</note>
+<simpara>Requirements and the minimum number of instances for each node type. This is sufficient of a PoC (Proof of Concept) environments.</simpara>
+<table frame="topbot" rowsep="1" colsep="1">
+<title>Openshift Requirements for SAP Data Intelligence Test Systems</title>
+<?dbhtml table-width="40%"?>
+<?dbfo table-width="40%"?>
+<?dblatex table-width="40%"?>
+<tgroup cols="7">
+<colspec colname="col_1" colwidth="24.2856*"/>
+<colspec colname="col_2" colwidth="24.2856*"/>
+<colspec colname="col_3" colwidth="24.2856*"/>
+<colspec colname="col_4" colwidth="24.2856*"/>
+<colspec colname="col_5" colwidth="24.2856*"/>
+<colspec colname="col_6" colwidth="24.2856*"/>
+<colspec colname="col_7" colwidth="24.2858*"/>
+<thead>
+<row>
+<entry align="left" valign="top">Type</entry>
+<entry align="left" valign="top">Count</entry>
+<entry align="left" valign="top">Operating System</entry>
+<entry align="left" valign="top">vCPU</entry>
+<entry align="left" valign="top">RAM (GB)</entry>
+<entry align="left" valign="top">Storage (GB)</entry>
+<entry align="left" valign="top">AWS  Instance Type</entry>
+</row>
+</thead>
+<tbody>
+<row>
+<entry align="left" valign="top"><simpara>Bootstrap</simpara></entry>
+<entry align="left" valign="top"><simpara>1</simpara></entry>
+<entry align="left" valign="top"><simpara>RHCOS</simpara></entry>
+<entry align="left" valign="top"><simpara>2</simpara></entry>
+<entry align="left" valign="top"><simpara>16</simpara></entry>
+<entry align="left" valign="top"><simpara>120</simpara></entry>
+<entry align="left" valign="top"><simpara>i3.large</simpara></entry>
+</row>
+<row>
+<entry align="left" valign="top"><simpara>Master</simpara></entry>
+<entry align="left" valign="top"><simpara>3+</simpara></entry>
+<entry align="left" valign="top"><simpara>RHCOS</simpara></entry>
+<entry align="left" valign="top"><simpara>4</simpara></entry>
+<entry align="left" valign="top"><simpara>16</simpara></entry>
+<entry align="left" valign="top"><simpara>120</simpara></entry>
+<entry align="left" valign="top"><simpara>m4.xlarge</simpara></entry>
+</row>
+<row>
+<entry align="left" valign="top"><simpara>Compute</simpara></entry>
+<entry align="left" valign="top"><simpara>3+</simpara></entry>
+<entry align="left" valign="top"><simpara>RHEL 7.6 or RHCOS</simpara></entry>
+<entry align="left" valign="top"><simpara>4</simpara></entry>
+<entry align="left" valign="top"><simpara>32</simpara></entry>
+<entry align="left" valign="top"><simpara>120</simpara></entry>
+<entry align="left" valign="top"><simpara>m4.2xlarge</simpara></entry>
+</row>
+<row>
+<entry align="left" valign="top"><simpara>Storage</simpara></entry>
+<entry align="left" valign="top"><simpara>3+</simpara></entry>
+<entry align="left" valign="top"><simpara>RHCOS</simpara></entry>
+<entry align="left" valign="top"></entry>
+<entry align="left" valign="top"></entry>
+<entry align="left" valign="top"></entry>
+<entry align="left" valign="top"></entry>
+</row>
+</tbody>
+<tfoot>
+<row>
+<entry align="left" valign="top"><simpara>Jump host</simpara></entry>
+<entry align="left" valign="top"><simpara>1</simpara></entry>
+<entry align="left" valign="top"><simpara>RHEL 7.6</simpara></entry>
+<entry align="left" valign="top"><simpara>2</simpara></entry>
+<entry align="left" valign="top"><simpara>4</simpara></entry>
+<entry align="left" valign="top"><simpara>75</simpara></entry>
+<entry align="left" valign="top"><simpara>t2.medium</simpara></entry>
+</row>
+</tfoot>
+</tgroup>
+</table>
+</section>
+<section xml:id="_verify_the_manangement_workstation">
+<title>Verify the manangement workstation</title>
+<orderedlist numeration="arabic">
+<listitem>
+<simpara>Login to the managament host</simpara>
+<screen>ssh &lt;admin-user&gt;@&lt;management host&gt;</screen>
+</listitem>
+<listitem>
+<simpara>Ensure the following software is installed</simpara>
+<itemizedlist>
+<listitem>
+<simpara>jq</simpara>
+</listitem>
+<listitem>
+<simpara>openshift client</simpara>
+<orderedlist numeration="loweralpha">
+<listitem>
+<simpara>get jq</simpara>
+<screen>dnf install jq</screen>
+</listitem>
+<listitem>
+<simpara>get oc CLI tool</simpara>
+<screen>OCP_VERSION=4.6.12
+wget https://mirror.openshift.com/pub/openshift-v4/clients/ocp/${OCP_VERSION}/openshift-client-linux-${OCP_VERSION}.tar.gz
+sudo tar zxvf openshift-client-linux-${OCP_VERSION}.tar.gz -C /usr/bin
+sudo rm -f openshift-client-linux-${OCP_VERSION}.tar.gz /usr/bin/README.md
+sudo chmod +x /usr/bin/oc /usr/bin/kubectl</screen>
+</listitem>
+</orderedlist>
+</listitem>
+</itemizedlist>
+</listitem>
+<listitem>
+<simpara>setup bash completion (optional)</simpara>
+<screen>oc completion bash | sudo tee /etc/bash_completion.d/openshift &gt; /dev/null</screen>
+</listitem>
+</orderedlist>
+</section>
+<section xml:id="_verify_openshift_cluster">
+<title>Verify Openshift Cluster</title>
+<orderedlist numeration="arabic">
+<listitem>
+<simpara>make sure you have Openshift Cluster admin rights</simpara>
+<screen>[root@provisioner ~]# oc whoami
+system:admin</screen>
+</listitem>
+<listitem>
+<simpara>check, that min requirements are met:</simpara>
+<screen># oc get nodes
+NAME           STATUS   ROLES        AGE     VERSION
+master-0       Ready    master       8d      v1.19.0+9c69bdc
+master-1       Ready    master       8d      v1.19.0+9c69bdc
+master-2       Ready    master       8d      v1.19.0+9c69bdc
+sdi-worker-1   Ready    worker       7d20h   v1.19.0+9c69bdc
+sdi-worker-2   Ready    worker       7d20h   v1.19.0+9c69bdc
+sdi-worker-3   Ready    worker       7d20h   v1.19.0+9c69bdc
+worker-0       Ready    worker       7d23h   v1.19.0+9c69bdc
+worker-1       Ready    worker       7d23h   v1.19.0+9c69bdc
+worker-2       Ready    worker       7d23h   v1.19.0+9c69bdc</screen>
+<simpara>You should see at least 6 worker nodes, <literal>worker-{0,1,2}</literal>  is used for OCS and <literal>sdi-worker-{1,2,3}</literal>
+will be used to install SAP Data Intelligence</simpara>
+<note>
+<simpara>It is a good practise to name the nodes according to its workload. In this example the <literal>worker-<emphasis role="strong"></literal>
+nodes run OCS and the <literal>sdi-worker-</emphasis></literal> nodes run the storage. The naming convention helps to better
+identify the usage.</simpara>
+</note>
+</listitem>
+<listitem>
+<simpara>Check the hardware resources of the cluster Nodes</simpara>
+<screen># oc describe node sdi-worker-{1,2,3}  | grep -A 6 Capacity
+Capacity:
+  cpu:                72
+  ephemeral-storage:  1171528260Ki
+  hugepages-1Gi:      0
+  hugepages-2Mi:      0
+  memory:             65821172Ki
+  pods:               250
+--
+Capacity:
+  cpu:                72
+  ephemeral-storage:  1171528260Ki
+  hugepages-1Gi:      0
+  hugepages-2Mi:      0
+  memory:             65821172Ki
+  pods:               250
+--
+Capacity:
+  cpu:                72
+  ephemeral-storage:  1171528260Ki
+  hugepages-1Gi:      0
+  hugepages-2Mi:      0
+  memory:             65821172Ki
+  pods:               250</screen>
+</listitem>
+</orderedlist>
+</section>
+<section xml:id="_prepare_ocp_cluster_for_sdi">
+<title>prepare OCP cluster for SDI</title>
+<orderedlist numeration="arabic">
+<listitem>
+<simpara>Label SDI compute Nodes</simpara>
+<screen># oc label node/sdi-worker-{1,2,3} node-role.kubernetes.io/sdi=""</screen>
+<note>
+<simpara>If you want to remove the label again run <literal>oc label node/worker-{0,1,2} node-role.kubernetes.io/sdi-</literal></simpara>
+</note>
+</listitem>
+<listitem>
+<simpara>Enable net-raw capability for containers on schedulable nodes</simpara>
+<simpara>Check existing with:</simpara>
+<screen>oc get machineconfigs -o yaml 97-crio-net-raw</screen>
+<simpara>if this doesn&#8217;t exist run:</simpara>
+<screen>#  oc create -f - &lt;&lt;EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: sdi
+  name: 97-crio-net-raw
+spec:
+  config:
+    ignition:
+      version: 2.2.0
+    storage:
+      files:
+      - contents:
+          source: data:text/plain;charset=utf-8;base64,W2NyaW8ucnVudGltZV0KZGVmYXVsdF9jYXBhYmlsaXRpZXMgPSBbCiAgICAgICAgIkNIT1dOIiwKICAgICAgICAiREFDX09WRVJSSURFIiwKICAgICAgICAiRlNFVElEIiwKICAgICAgICAiRk9XTkVSIiwKICAgICAgICAiU0VUR0lEIiwKICAgICAgICAiU0VUVUlEIiwKICAgICAgICAiU0VUUENBUCIsCiAgICAgICAgIk5FVF9CSU5EX1NFUlZJQ0UiLAogICAgICAgICJLSUxMIiwKICAgICAgICAiTkVUX1JBVyIsCl0K
+          verification: {}
+        filesystem: root
+        mode: 420
+        path: /etc/crio/crio.conf.d/90-default-capabilities
+EOF</screen>
+<note>
+<simpara>If you get the message: <literal>Error from server (AlreadyExists): error when creating "STDIN": machineconfigs.machineconfiguration.openshift.io "97-crio-net-raw" already exists</literal>
+rerun with <literal>oc replace -f</literal></simpara>
+</note>
+</listitem>
+<listitem>
+<simpara>Pre-load needed kernel modules</simpara>
+<simpara>Check existing with:</simpara>
+<screen>oc get machineconfigs -o yaml 75-worker-sap-data-intelligence</screen>
+<simpara>The follwoing command prints the config file, if it exists on the host</simpara>
+<screen>for worker in `oc get nodes  | awk '/worker/{print $1}'`; do
+   oc debug node/$worker -- chroot /host cat /etc/modules-load.d/sdi-dependencies.conf
+   oc debug node/$worker -- chroot /host systemctl status sdi-modules-load.service
+done</screen>
+<simpara>If the modules file does not exist run the following to create it:</simpara>
+<screen># oc replace -f - &lt;&lt;EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+ labels:
+   machineconfiguration.openshift.io/role: sdi
+ name: 75-worker-sap-data-intelligence
+spec:
+ config:
+   ignition:
+     version: 2.2.0
+   storage:
+     files:
+     - contents:
+         source: "data:text/plain;charset=utf-8;base64,$content"
+         verification: {}
+       filesystem: root
+       mode: 420
+       path: /etc/modules-load.d/sdi-dependencies.conf
+   systemd:
+     units:
+     - contents: |
+         [Unit]
+         Description=Pre-load kernel modules for SAP Data Intelligence
+         After=network.target
+
+         [Service]
+         Type=oneshot
+         ExecStart=/usr/sbin/modprobe iptable_nat
+         ExecStart=/usr/sbin/modprobe iptable_filter
+         RemainAfterExit=yes
+
+         [Install]
+         WantedBy=multi-user.target
+       enabled: true
+       name: sdi-modules-load.service
+EOF
+machineconfig.machineconfiguration.openshift.io/75-worker-sap-data-intelligence replaced</screen>
+</listitem>
+<listitem>
+<simpara>PID limits</simpara>
+<simpara>Check if PID Limits are already set:</simpara>
+<screen># for worker in `oc get nodes  | awk '/sdi-worker/{print $1}'`; do
+  oc debug node/$worker chroot /host -- cat /etc/crio/crio.conf.d/ /etc/crio/crio.conf.d/01-ctrcfg-pidsLimit
+done | grep -i pids_limit</screen>
+<note>
+<simpara>the file path may change using a different OCP version</simpara>
+</note>
+<simpara>check if the config is already created:</simpara>
+<screen>oc get ContainerRuntimeConfigs -o yaml sdi-pids-limit</screen>
+<simpara>Create the runtime config</simpara>
+<screen># oc create -f - &lt;&lt;EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: ContainerRuntimeConfig
+metadata:
+name: sdi-pids-limit
+spec:
+machineConfigPoolSelector:
+  matchLabels:
+   workload: sapdataintelligence
+containerRuntimeConfig:
+  pidsLimit: 16384
+EOF
+containerruntimeconfig.machineconfiguration.openshift.io/sdi-pids-limit created</screen>
+</listitem>
+<listitem>
+<simpara>Associate MachineConfigs to the Nodes</simpara>
+<simpara>The machine configs match to a machine config pool is  labeled <literal>workload: sapdataintelligence</literal>.
+the follwing command creates a machine config pool out of nodes which have the role <literal>SDI</literal> labeled
+<literal>workload: sapdataintelligence</literal>. Hence the new config is created on these nodes by the machine operator.</simpara>
+<screen># oc create -f - &lt;&lt;EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfigPool
+metadata:
+  labels:
+    workload: sapdataintelligence
+  name: sdi
+spec:
+  machineConfigSelector:
+    matchExpressions:
+    - key: machineconfiguration.openshift.io/role
+      operator: In
+      values:
+      - sdi
+      - worker
+  nodeSelector:
+    matchLabels:
+      node-role.kubernetes.io/sdi: ''
+EOF</screen>
+<simpara>It may take a while until all nodes are updated.  The following command can be used to wait until the change gets applied to all the worker nodes:</simpara>
+<screen>oc wait mcp/sdi --all --for=condition=updated</screen>
+<simpara>The following command lists steh status of the nodes:</simpara>
+<screen> oc get mcp</screen>
+<note>
+<simpara>If the update is not working, check the machineconfig operator</simpara>
+</note>
+</listitem>
+<listitem>
+<simpara>Double check that settings are made</simpara>
+<simpara>you can use the following script to double check that all required changes are made on the
+Openshift Worker nodes</simpara>
+<screen>#!/usr/bin/bash
+
+# CHECK OCP (Note Files may change after update)
+
+for worker in `oc get nodes|awk '/worker/{print $1}'`; do
+  echo "Checking node $worker ------------------------------------------------------------------------------"
+  # Check for additional kernelmodules
+  oc debug node/$worker -- chroot /host cat /etc/crio/crio.conf.d/90-default-capabilities  2&gt; /dev/null
+  # Check for additional kernelmodules
+  oc debug node/$worker -- chroot /host cat /etc/modules-load.d/sdi-dependencies.conf 2&gt; /dev/null
+  # check for module load service
+  oc debug node/$worker -- chroot /host systemctl status sdi-modules-load.service 2&gt; /dev/null
+  # check for pidsLimit:
+  oc debug node/$worker -- chroot /host cat /etc/crio/crio.conf.d/01-ctrcfg-pidsLimit
+  echo "--------------------------------------------------------------------------------------------------------"
+done</screen>
+</listitem>
+</orderedlist>
+</section>
+<section xml:id="_configure_storage">
+<title>Configure Storage</title>
+<orderedlist numeration="arabic">
+<listitem>
+<simpara>Check that OCS is properly installed</simpara>
+<simpara><emphasis role="strong">TODO</emphasis> &#8594; Please give hints how to do this</simpara>
+</listitem>
+<listitem>
+<simpara>Create Project to keep SDI Storage</simpara>
+<screen># oc new-project sdi-infra
+Now using project "sdi-infra" on server "https://api.lab.hpecloud.org:6443".
+
+You can add applications to this project with the 'new-app' command. For example, try:
+
+    oc new-app django-psql-example
+
+to build a new example application in Python. Or use kubectl to deploy a simple Kubernetes application:
+
+    kubectl create deployment hello-node --image=gcr.io/hello-minikube-zero-install/hello-node
+
+[root@provisioner ~]# oc project
+Using project "sdi-infra" on server "https://api.lab.hpecloud.org:6443".</screen>
+</listitem>
+<listitem>
+<simpara>Create  S3 buckets for checkpoint store (required) and data lake (optional)</simpara>
+<screen># for claimName in sdi-checkpoint-store sdi-data-lake; do
+   oc create -f - &lt;&lt;EOF
+apiVersion: objectbucket.io/v1alpha1
+kind: ObjectBucketClaim
+metadata:
+ name: ${claimName}
+spec:
+ generateBucketName: ${claimName}
+ storageClassName: openshift-storage.noobaa.io
+EOF
+done
+objectbucketclaim.objectbucket.io/sdi-checkpoint-store created
+objectbucketclaim.objectbucket.io/sdi-data-lake created</screen>
+<simpara>Check if buckets are created:</simpara>
+<screen># oc get obc -w
+NAME                   STORAGE-CLASS                 PHASE   AGE
+sdi-checkpoint-store   openshift-storage.noobaa.io   Bound   58s
+sdi-data-lake          openshift-storage.noobaa.io   Bound   58s</screen>
+</listitem>
+<listitem>
+<simpara>Get the credentials required by the SDI installer</simpara>
+<screen># for claimName in sdi-checkpoint-store sdi-data-lake; do
+   printf 'Bucket/claim %s:\n  Bucket name:\t%s\n' "$claimName" "$(oc get obc -o jsonpath='{.spec.bucketName}' "$claimName")"
+   for key in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do
+     printf '  %s:\t%s\n' "$key" "$(oc get secret "$claimName" -o jsonpath="{.data.$key}" | base64 -d)"
+   done
+done | column -t -s $'\t'
+
+Bucket/claim sdi-checkpoint-store:
+  Bucket name:                      sdi-checkpoint-store-22d885f0-da59-4d24-bffa-5e908bf78d1d
+  AWS_ACCESS_KEY_ID:                &lt; keep this &gt;
+  AWS_SECRET_ACCESS_KEY:            &lt; keep this &gt;
+Bucket/claim sdi-data-lake:
+  Bucket name:                      sdi-data-lake-c132663c-b96b-4e6a-ba3b-01db3e999f82
+  AWS_ACCESS_KEY_ID:                &lt; keep this &gt;
+  AWS_SECRET_ACCESS_KEY:            &lt; keep this &gt;</screen>
+</listitem>
+</orderedlist>
+</section>
+<section xml:id="_deploy_sdi_observer">
+<title>Deploy SDI OBSERVER</title>
+<simpara>SDI Observer is a redhat monitoring software that controls the behaviour and  the proper
+installation of SDI</simpara>
+<orderedlist numeration="arabic">
+<listitem>
+<simpara>Create Namespaces for SDI Observer:</simpara>
+<screen>#  NAMESPACE=sdi-observer SDI_NAMESPACE=sdi SLCB_NAMESPACE=sap-slcbridge
+#  for nm in $SDI_NAMESPACE $SLCB_NAMESPACE $NAMESPACE; do oc new-project $nm; done</screen>
+</listitem>
+<listitem>
+<simpara>Create a service account for <literal>registry.redhat.io</literal> at <link xl:href="https://access.redhat.com/terms-based-registry/">https://access.redhat.com/terms-based-registry/</link>,
+download and save it to <literal>rht-registry-secret.yaml</literal></simpara>
+</listitem>
+<listitem>
+<simpara>Create the Pull Secret for redhat registry within sdi-observer namespace:</simpara>
+<screen># oc create -n "${NAMESPACE:-sdi-observer}" -f rht-registry-secret.yaml
+secret/5318290-sap-di-westford-pull-secret created</screen>
+</listitem>
+<listitem>
+<simpara>double check that the</simpara>
+</listitem>
+<listitem>
+<simpara>set the variables for SDI Observer &amp; install</simpara>
+<simpara>You can influence the behaviour of SDI observer by setting certain environment variables.
+See <link xl:href="https://access.redhat.com/articles/5100521">https://access.redhat.com/articles/5100521</link> section 4.1 for the variable lists</simpara>
+<screen>NAMESPACE=sdi-observer
+SDI_NAMESPACE=sdi
+SLCB_NAMESPACE=sap-slcbridge
+OCP_MINOR_RELEASE=4.6
+#NODE_LOG_FORMAT=text
+DEPLOY_SDI_REGISTRY=true
+INJECT_CABUNDLE=true
+#BUNDLE_SECRET_NAME=openshift-ingress-operator/router-ca
+MANAGE_VSYSTEM_ROUTE=true
+REDHAT_REGISTRY_SECRET_NAME=5318290-sap-di-westford-pull-secret
+SDI_NODE_SELECTOR=node-role.kubernetes.io/sdi=
+
+oc process -f https://raw.githubusercontent.com/redhat-sap/sap-data-intelligence/master/observer/ocp-template.json \
+        NAMESPACE="${NAMESPACE:-sdi-observer}" \
+        SDI_NAMESPACE="${SDI_NAMESPACE:-sdi}" \
+        SLCB_NAMESPACE="${SLCB_NAMESPACE:-sap-slcbridge}" \
+        OCP_MINOR_RELEASE="${OCP_MINOR_RELEASE:-4.6}" \
+        DEPLOY_SDI_REGISTRY="${DEPLOY_SDI_REGISTRY:-true}" \
+        INJECT_CABUNDLE="${INJECT_CABUNDLE:-true}" \
+        MANAGE_VSYSTEM_ROUTE="${MANAGE_VSYSTEM_ROUTE:-true}" \
+        SDI_NODE_SELECTOR="${SDI_NODE_SELECTOR}" \
+        REDHAT_REGISTRY_SECRET_NAME="$REDHAT_REGISTRY_SECRET_NAME" | oc create -f -</screen>
+<note>
+<simpara>You can change or at variables at a later time with the following command: <literal>oc set env -n sdi-observer dc/sdi-observer &lt;variable name&gt;=&lt;value&gt;</literal></simpara>
+</note>
+<note>
+<simpara>you can list the variables with <literal>oc set env  -n sdi-observer --list dc/sdi-observer</literal></simpara>
+</note>
+</listitem>
+<listitem>
+<simpara>Check Registry, get the credentials and and configure OCP to trust do appropriate settings:</simpara>
+<simpara>The follwoing script tests the registry, prints the access credentials and makes some required additional settings
+in the cluster to trust the deployed DEPLOY_SDI_REGISTRY:</simpara>
+<screen>#!/bin/bash
+
+## Change Namespace to sdi-observer
+NAMESPACE="${NAMESPACE:-sdi-observer}"
+oc project sdi-observer
+
+## Obtain registry credentials
+reg_credentials=$(oc get -o json -n "${NAMESPACE:-sdi-observer}" secret/container-image-registry-htpasswd | jq -r '.data[".htpasswd.raw"] | @base64d')
+reg_user=$(echo $reg_credentials| cut -d: -f1)
+reg_pw=$(echo $reg_credentials| cut -d: -f2)
+
+## Obtain registry hostname
+reg_hostname="$(oc get route -n "${NAMESPACE:-sdi-observer}" container-image-registry -o jsonpath='{.spec.host}')"
+echo "================================================="
+echo "Using registry: $reg_hostname"
+echo "USER: $reg_user"
+echo "PW  : $reg_pw"
+echo "================================================="
+
+### Obtain Ingress Router's default self-signed CA certificate
+mkdir -p "/etc/containers/certs.d/${reg_hostname}"
+router_ca_crt="/etc/containers/certs.d/${reg_hostname}/router-ca.crt"
+oc get secret -n openshift-ingress-operator -o json router-ca | \
+    jq -r '.data as $d | $d | keys[] | select(test("\\.crt$")) | $d[.] | @base64d' &gt; ${router_ca_crt}
+
+### test via curl
+curl -I --user ${reg_credentials}  --cacert ${router_ca_crt} "https://${reg_hostname}/v2/"
+
+### test via podman
+echo $reg_pw |  podman login -u $reg_user --password-stdin ${reg_hostname}
+
+reg_login_ok=$?
+
+if [ $reg_login_ok ]; then
+  # Configure Openshift to trust container registry (8.2)
+  echo "Configure Openshift to trust container registry"
+  echo "CTRL-C to stop, ENTER to continue"
+  read zz
+  caBundle="$(oc get -n openshift-ingress-operator -o json secret/router-ca | \
+    jq -r '.data as $d | $d | keys[] | select(test("\\.(?:crt|pem)$")) | $d[.] | @base64d')"
+  # determine the name of the CA configmap if it exists already
+  cmName="$(oc get images.config.openshift.io/cluster -o json | \
+    jq -r '.spec.additionalTrustedCA.name // "trusted-registry-cabundles"')"
+  if oc get -n openshift-config "cm/$cmName" 2&gt;/dev/null; then
+    # configmap already exists -&gt; just update it
+    oc get -o json -n openshift-config "cm/$cmName" | \
+        jq '.data["'"${reg_hostname//:/..}"'"] |= "'"$caBundle"'"' | \
+        oc replace -f - --force
+  else
+      # creating the configmap for the first time
+      oc create configmap -n openshift-config "$cmName" \
+          --from-literal="${reg_hostname//:/..}=$caBundle"
+      oc patch images.config.openshift.io cluster --type=merge \
+          -p '{"spec":{"additionalTrustedCA":{"name":"'"$cmName"'"}}}'
+  fi
+  # Check that the certifcate is deployed
+  oc rsh -n openshift-image-registry "$(oc get pods -n openshift-image-registry -l docker-registry=default | \
+        awk '/Running/ {print $1; exit}')" ls -1 /etc/pki/ca-trust/source/anchors
+
+else
+  echo "Registry setup failed, please repair before you continue"
+fi</screen>
+</listitem>
+</orderedlist>
+<section xml:id="_install_sdi_install_bridge">
+<title>Install SDI Install Bridge</title>
+<simpara>Now that the SDI observer is running, we can install the SDI Install Bridge container that is
+used to install SDI on the Cluster
+The following steps should run as the user <literal>sdiadmin</literal> with the appropriate cluster rules</simpara>
+<screen># oc whoami
+sdiadmin</screen>
+<note>
+<simpara>This document assumes your cluster has direct internet access. If you require
+proxy settings follow the steps in <link xl:href="https://access.redhat.com/articles/5100521">https://access.redhat.com/articles/5100521</link> section 5.1</simpara>
+</note>
+<orderedlist numeration="arabic">
+<listitem>
+<simpara>Download the SAP install bridge from SAP (you need your S-User now)</simpara>
+<simpara>Download SLCB01_&lt;Version&gt;.EXE for Linux from <link xl:href="https://support.sap.com/">https://support.sap.com/</link>, rename it to <literal>slcb</literal> and make it
+executable</simpara>
+<screen># mv SLCB01_*.EXE /usr/bin/slcb
+# chmod +x /usr/bin/slcb</screen>
+</listitem>
+<listitem>
+<simpara>Install SDI Install Bridge</simpara>
+<note>
+<simpara>This tutorial is tested with version 1.1.58. You can always install this version with
+<literal>`slcb init --bridgebaseVersion 1.1.58</literal>, but any later version should do, too.</simpara>
+</note>
+<simpara>When answering the installer, the following slections are important:</simpara>
+<itemizedlist>
+<listitem>
+<simpara>Installation Type: Expert Mode</simpara>
+</listitem>
+<listitem>
+<simpara>Service Type NodePort</simpara>
+</listitem>
+<listitem>
+<simpara>Have a look at <link xl:href="https://access.redhat.com/articles/5100521">https://access.redhat.com/articles/5100521</link>, if you need to configure proxies - This example assumes direct connection
+to the internet</simpara>
+<simpara>Now you need the different credentials and information you noted earlier. Execute <literal>slcb init</literal>.
+Here is an example log:</simpara>
+<screen>$ slcb init
+
+'slcb' executable information
+Executable:   slcb
+Build date:   2020-12-18 15:30:09 UTC
+Git branch:   fa/rel-1.1
+Git revision: 13d28b8fd5352a6fb058fa86622c8deef4abf841
+Platform:     linux
+Architecture: amd64
+Version:      1.1.58
+SLUI version: 2.6.66
+Arguments:    init
+Working dir:  /home/mkoch
+Schemata:     0.0.58, 1.11.58
+
+
+Execute step Download Bridge Images
+
+***********************************
+* Product Bridge Image Repository *
+***********************************
+
+Enter the address of your private container image repository used to store the bridge images.
+You require read and write permissions for this repository.
+  Address of the Container Image Repository [&lt;F1&gt;]: container-image-registry-sdi-observer.apps.lab.hpecloud.org
+
+
+************************
+* Image Registry User  *
+************************
+
+The user name used to logon to "container-image-registry-sdi-observer.apps.lab.hpecloud.org".
+  Image registry user name [&lt;F1&gt;]: user-x4sawa
+  Image registry password [&lt;F1&gt;]:
+
+
+***************************
+* Enter Logon Information *
+***************************
+
+You require S-User credentials to log on to the SAP Registry ("rhapi.repositories.cloud.sap") for product version "SL TOOLSET 1.0" (01200615320900005323)
+  S-User Name [&lt;F1&gt;]: S0000012345
+  Password [&lt;F1&gt;]:
+
+Copying image slcb://01200615320900005323.dockersrv.repositories.sapcdn.io/com.sap.sl.cbpod/slcbridgebase:1.1.58 to "container-image-registry-sdi-observer.apps.lab.hpecloud.org"
+Copying image slcb://01200615320900005323.dockersrv.repositories.sapcdn.io/com.sap.sl.cbpod/nginx-sidecar:1.1.58 to "container-image-registry-sdi-observer.apps.lab.hpecloud.org"
+
+Execute step Check Prerequisites
+
+************************
+*  Prerequiste Check   *
+************************
+
+Checking the prerequisites for "SL Container Bridge" succeeded.
+
+Kubernetes Cluster Context:
+
+
+Cluster name:   api-lab-hpecloud-org:6443
+API server URL: https://api.lab.hpecloud.org:6443
+
+Editable Prerequisites
+
+Enter the path to the "kubectl" configuration file. The configuration information contained in this file will specify the cluster on which you are about to perform the deployment.
+  Path to the "kubeconfig" file [&lt;F1&gt;]: /home/mkoch/.kube/config
+
+Prerequisite Check Result
+
+
+Name                      Current Value            Result      Error Message
+KUBECONFIG                /home/mkoch/.kube/config + (passed)
+Kubernetes Server Version 1.19.0                   + (passed)
+
+
+
+Choose "Retry" to retry the Prerequisite Check.
+Choose "Back" to go back to Product Information Dialog.
+Choose "Next" to continue.
+
+  Choose action Retry/Next [r/n/&lt;F1&gt;]: n
+
+Execute step Collect Input
+
+***************************************************************************
+* Choose whether you want to run the deployment in typical or expert mode *
+***************************************************************************
+
+You can run the deployment either in typical or expert mode:
+
+- Typical Mode
+   If you choose "Typical Mode", the option is performed with default settings. As a result, you only have to respond to a small selection of prompts.
+- Expert Mode
+   If you choose "Expert Mode", you are prompted for all parameters.
+
+
+   &gt; 1. Typical Mode
+     2. Expert Mode
+  possible values [1,2] [&lt;F1&gt;]: 2
+
+
+************************
+* SLC Bridge Namespace *
+************************
+
+Enter the Kubernetes namespace for the SLC Bridge.
+  Namespace [&lt;F1&gt;]: sap-slcbridge
+
+
+************************
+*  Administrator User  *
+************************
+
+Specify the name of the administrator user for the SLC Bridge Base.
+  User Name [&lt;F1&gt;]: sdiadmin
+
+
+*******************************
+* Administrator User Password *
+*******************************
+
+Define the password of the administrator user sdiadmin
+  Password of User sdiadmin [&lt;F1&gt;]:
+  Confirm:
+
+
+***********************************************
+* Service Type of the SLC Bridge Base Service *
+***********************************************
+
+In order to access the SLC Bridge Base, the UI Port needs to be exposed. This is accomplished by defining a Kubernetes service.
+Kubernetes offers multiple service types. SAP currently supports the following service types. You have to select one of them.
+
+- Service Type "LoadBalancer" is suitable if your Kubernetes cluster comes with a controller for this service type. For example, this is the case for all hyperscaler platforms.
+- Service Type "NodePort" is suitable if your Kubernetes cluster runs on premise and the cluster nodes can be reached from your network
+
+
+   &gt; 1. Service Type LoadBalancer
+     2. Service Type NodePort
+  possible values [1,2] [&lt;F1&gt;]: 2
+
+
+************************
+*    Proxy Settings    *
+************************
+
+Do you want to configure Proxy Settings for the Pods running in the cluster?
+
+This is necessary if the Pods in the cluster are running behind a proxy.
+
+   Configure Proxy Settings: n
+  possible values [y/n] [&lt;F1&gt;]: n
+
+
+Execute step Show Summary
+
+************************
+*  Parameter Summary   *
+************************
+
+Choose "Next" to start the deployment with the displayed parameter values or choose "Back" to revise the parameters.
+
+
+SLC Bridge Namespace
+   Namespace: sap-slcbridge
+
+
+Image Registry User
+   Image registry user name: user-x4sawa
+
+
+SLP_BRIDGE_REPOSITORY_PASSWORD
+
+
+Enter Logon Information
+   S-User Name: S0008065507
+
+
+IMAGES_SAP_SUSER_PASSWORD
+
+
+KUBECONFIG
+   Path to the "kubeconfig" file: /home/mkoch/.kube/config
+
+
+Choose whether you want to run the deployment in typical or expert mode
+     1. Typical Mode
+   &gt; 2. Expert Mode
+
+
+Administrator User
+   User Name: sdiadmin
+
+
+Administrator User Password
+
+
+Service Type of the SLC Bridge Base Service
+     1. Service Type LoadBalancer
+   &gt; 2. Service Type NodePort
+
+
+Proxy Settings
+   Configure Proxy Settings: n
+
+
+Choose "Next" to start the deployment with the displayed parameter values or choose "Back" to revise the parameters.
+
+  Choose action Next [n/&lt;F1&gt;]: n
+Apply Secret Template (secret-slcbridge.yml)...
+
+Execute step Master secret
+Apply Secret Template (secret-nginx.yml)...
+
+Execute step Nginx secret
+
+Execute step Wait for Kubernetes Object SLCBridgeNamespace
+
+Execute step Wait for Kubernetes Object SLCBridgeServiceAccount
+
+Execute step Wait for Kubernetes Object DefaultsMap
+
+Execute step Wait for Kubernetes Object ProductHistory
+
+Execute step Wait for Kubernetes Object MasterSecret
+
+Execute step Wait for Kubernetes Object NginxConf
+
+Execute step Wait for Kubernetes Object NginxSecret
+
+Execute step Wait for Kubernetes Object NetworkPolicy
+
+Execute step Wait for Kubernetes Object SLCBridgePod
+
+Execute step SL Container Bridge
+
+************************
+*       Message        *
+************************
+
+
+Deployment "slcbridgebase" has 1 available replicas in namespace "sap-slcbridge"
+Service slcbridgebase-service is listening on any of the kubernetes nodes on "https://node:30578/docs/index.html"
+
+  Choose action Next [n/&lt;F1&gt;]: n
+
+Execute step Get User Feedback
+
+******************************
+* Provide feedback to SAP SE *
+******************************
+
+Dear user, please help us improve our software by providing your feedback (press &lt;F1&gt; for more information).
+
+   &gt; 1. Fill out questionnaire
+     2. Send analytics data only
+     3. No feedback
+  possible values [1,2,3] [&lt;F1&gt;]: 3
+
+
+Execute step Service Completed</screen>
+<note>
+<simpara>this is an interactive script, which currently cannot run unattended</simpara>
+</note>
+</listitem>
+</itemizedlist>
+</listitem>
+<listitem>
+<simpara>Check Bridge is running:</simpara>
+<simpara>If everything went well you can see the resources like this:</simpara>
+<screen>$ oc -n sap-slcbridge get all
+NAME                                 READY   STATUS    RESTARTS   AGE
+pod/slcbridgebase-6cd8b94579-4l72q   2/2     Running   0          24m
+
+NAME                            TYPE       CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE
+service/slcbridgebase-service   NodePort   172.30.122.31   &lt;none&gt;        9000:30578/TCP   24m
+
+NAME                            READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/slcbridgebase   1/1     1            1           24m
+
+NAME                                       DESIRED   CURRENT   READY   AGE
+replicaset.apps/slcbridgebase-6cd8b94579   1         1         1       24m</screen>
+</listitem>
+<listitem>
+<simpara>connect to the bridge</simpara>
+<simpara>Get the exposed node port and pick an IP address of one of the nodes and point your browser to: <link xl:href="https://&lt;IP&gt;:&lt;NodePort&gt;/docs/index.html">https://&lt;IP&gt;:&lt;NodePort&gt;/docs/index.html</link></simpara>
+<itemizedlist>
+<listitem>
+<simpara>Get IP: </simpara>
+<screen>oc get node -o wide sdi-worker-1
+NAME           STATUS   ROLES        AGE   VERSION           INTERNAL-IP    EXTERNAL-IP   OS-IMAGE                                                       KERNEL-VERSION                 CONTAINER-RUNTIME
+sdi-worker-1   Ready    sdi,worker   14d   v1.19.0+9c69bdc   10.19.20.160   &lt;none&gt;        Red Hat Enterprise Linux CoreOS 46.82.202101131942-0 (Ootpa)   4.18.0-193.40.1.el8_2.x86_64   cri-o://1.19.1-2.rhaos4.6.git2af9ecf.el8</screen>
+</listitem>
+<listitem>
+<simpara>Get Port</simpara>
+<screen>oc get svc -n "${SLCB_NAMESPACE:-sap-slcbridge}" slcbridgebase-service -o jsonpath=$'{.spec.ports[0].nodePort}\n'
+30578</screen>
+<simpara>In this example point your browser to <link xl:href="https://10.19.20.160:30578/docs/index.html">https://10.19.20.160:30578/docs/index.html</link></simpara>
+<note>
+<simpara>Username/Password: Use the one that you provided during installation</simpara>
+</note>
+<simpara>You should see this:</simpara>
+<simpara><inlinemediaobject>
+<imageobject>
+<imagedata fileref="images/image10.png"/>
+</imageobject>
+<textobject><phrase>image</phrase></textobject>
+</inlinemediaobject></simpara>
+</listitem>
+</itemizedlist>
+</listitem>
+</orderedlist>
+</section>
+<section xml:id="_sdi_installation">
+<title>SDI installation</title>
+<simpara>Finally you can start the SDI Installation</simpara>
+<orderedlist numeration="arabic">
+<listitem>
+<simpara>Go to the maintenance planner (MP) at <link xl:href="https://apps.support.sap.com/sap/support/mp">https://apps.support.sap.com/sap/support/mp</link> and start the installation.</simpara>
+<note>
+<simpara>The bridge has to be opened in an active window all the time while working with (MP)</simpara>
+</note>
+<simpara>First you have to enter a password</simpara>
+<simpara><inlinemediaobject>
+<imageobject>
+<imagedata fileref="images/image13.png"/>
+</imageobject>
+<textobject><phrase>image</phrase></textobject>
+</inlinemediaobject></simpara>
+</listitem>
+<listitem>
+<simpara>Enter the Default Tenant name:</simpara>
+<simpara><inlinemediaobject>
+<imageobject>
+<imagedata fileref="images/image9.png"/>
+</imageobject>
+<textobject><phrase>image</phrase></textobject>
+</inlinemediaobject></simpara>
+</listitem>
+<listitem>
+<simpara>Enter the Default Tenant Adminstrator name and password:</simpara>
+<simpara><inlinemediaobject>
+<imageobject>
+<imagedata fileref="images/image20.png"/>
+</imageobject>
+<textobject><phrase>image</phrase></textobject>
+</inlinemediaobject></simpara>
+</listitem>
+<listitem>
+<simpara>As our cluster has direct access to the internet we do not need to set proxies. If this is different
+in you environment read <link xl:href="https://help.sap.com/viewer/a8d90a56d61a49718ebcb5f65014bbe7/3.1.latest/en-US/6a64f00a5ad643c79236b4a5fa09b79e.html">the SAP documentation</link></simpara>
+<simpara><inlinemediaobject>
+<imageobject>
+<imagedata fileref="images/image14.png"/>
+</imageobject>
+<textobject><phrase>image</phrase></textobject>
+</inlinemediaobject></simpara>
+</listitem>
+<listitem>
+<simpara>disable backup</simpara>
+<simpara>Do not configure backup: SAP Note 2918288</simpara>
+<simpara>[&#8230;&#8203;] the object storage infrastructure NooBaa cannot be used as backup media, if Vora is used.</simpara>
+<simpara>To disable backup be sure to remove the check mark (picture is default)</simpara>
+<simpara><inlinemediaobject>
+<imageobject>
+<imagedata fileref="images/image25.png"/>
+</imageobject>
+<textobject><phrase>image</phrase></textobject>
+</inlinemediaobject></simpara>
+</listitem>
+<listitem>
+<simpara>enable Checkpoint store</simpara>
+<simpara>ensure the checkmark is set</simpara>
+<simpara><inlinemediaobject>
+<imageobject>
+<imagedata fileref="images/image8.png"/>
+</imageobject>
+<textobject><phrase>image</phrase></textobject>
+</inlinemediaobject></simpara>
+<simpara>select <literal>S3 Compatible object store</literal>
+<inlinemediaobject>
+<imageobject>
+<imagedata fileref="images/image1.png"/>
+</imageobject>
+<textobject><phrase>image</phrase></textobject>
+</inlinemediaobject></simpara>
+<simpara>Use the name and credentials for checkpoint store created earlier, the endpoint for NooBa S3 is always
+<link xl:href="http://s3.openshift-storage/svc.cluster.local">http://s3.openshift-storage/svc.cluster.local</link></simpara>
+<simpara><inlinemediaobject>
+<imageobject>
+<imagedata fileref="images/image19.png"/>
+</imageobject>
+<textobject><phrase>image</phrase></textobject>
+</inlinemediaobject><inlinemediaobject>
+<imageobject>
+<imagedata fileref="images/image11.png"/>
+</imageobject>
+<textobject><phrase>image</phrase></textobject>
+</inlinemediaobject></simpara>
+<simpara><inlinemediaobject>
+<imageobject>
+<imagedata fileref="images/image21.png"/>
+</imageobject>
+<textobject><phrase>image</phrase></textobject>
+</inlinemediaobject></simpara>
+<simpara><inlinemediaobject>
+<imageobject>
+<imagedata fileref="images/image2.png"/>
+</imageobject>
+<textobject><phrase>image</phrase></textobject>
+</inlinemediaobject></simpara>
+<simpara>Even if your cluster is setup correctly, the validation takes a while. Don&#8217;t worry.
+If it fails, double check that you use http and not https. With private certificates this may not work</simpara>
+</listitem>
+<listitem>
+<simpara>Continue with the defaults on the next screens</simpara>
+<simpara>Use the default storage class for persistent volumes</simpara>
+<simpara><inlinemediaobject>
+<imageobject>
+<imagedata fileref="images/image5.png"/>
+</imageobject>
+<textobject><phrase>image</phrase></textobject>
+</inlinemediaobject></simpara>
+<simpara>no special docker log path</simpara>
+<simpara><inlinemediaobject>
+<imageobject>
+<imagedata fileref="images/image7.png"/>
+</imageobject>
+<textobject><phrase>image</phrase></textobject>
+</inlinemediaobject></simpara>
+<simpara>Enable Kaniko</simpara>
+<simpara><inlinemediaobject>
+<imageobject>
+<imagedata fileref="images/image22.png"/>
+</imageobject>
+<textobject><phrase>image</phrase></textobject>
+</inlinemediaobject></simpara>
+<simpara>You do not need a differnt container image repo for modeler for demo purpose</simpara>
+<simpara><inlinemediaobject>
+<imageobject>
+<imagedata fileref="images/image24.png"/>
+</imageobject>
+<textobject><phrase>image</phrase></textobject>
+</inlinemediaobject></simpara>
+<simpara>Enable load Kernel Modules, although this has been already handled by the installer</simpara>
+<simpara><inlinemediaobject>
+<imageobject>
+<imagedata fileref="images/image4.png"/>
+</imageobject>
+<textobject><phrase>image</phrase></textobject>
+</inlinemediaobject></simpara>
+<simpara>Leave defaults</simpara>
+<simpara><inlinemediaobject>
+<imageobject>
+<imagedata fileref="images/image15.png"/>
+</imageobject>
+<textobject><phrase>image</phrase></textobject>
+</inlinemediaobject></simpara>
+<simpara><inlinemediaobject>
+<imageobject>
+<imagedata fileref="images/image3.png"/>
+</imageobject>
+<textobject><phrase>image</phrase></textobject>
+</inlinemediaobject></simpara>
+<simpara><inlinemediaobject>
+<imageobject>
+<imagedata fileref="images/image17.png"/>
+</imageobject>
+<textobject><phrase>image</phrase></textobject>
+</inlinemediaobject></simpara>
+<simpara><inlinemediaobject>
+<imageobject>
+<imagedata fileref="images/image18.png"/>
+</imageobject>
+<textobject><phrase>image</phrase></textobject>
+</inlinemediaobject></simpara>
+<simpara><inlinemediaobject>
+<imageobject>
+<imagedata fileref="images/image12.png"/>
+</imageobject>
+<textobject><phrase>image</phrase></textobject>
+</inlinemediaobject></simpara>
+</listitem>
+<listitem>
+<simpara>It makes sense to change the default clustername: e.g. to sdidemo</simpara>
+<simpara><inlinemediaobject>
+<imageobject>
+<imagedata fileref="images/image6.png"/>
+</imageobject>
+<textobject><phrase>image</phrase></textobject>
+</inlinemediaobject></simpara>
+<simpara>Next is a summary of the installation parameters.</simpara>
+</listitem>
+<listitem>
+<simpara>Kick of the installation
+Kick of the installation. After installation the following screen appears</simpara>
+<simpara><inlinemediaobject>
+<imageobject>
+<imagedata fileref="images/image23.png"/>
+</imageobject>
+<textobject><phrase>image</phrase></textobject>
+</inlinemediaobject></simpara>
+</listitem>
+</orderedlist>
+<caution>
+<simpara>Note your System ID. In this example it is  <literal>11bw3dz</literal></simpara>
+</caution>
+</section>
+<section xml:id="_post_installation_work">
+<title>Post Installation work</title>
+<orderedlist numeration="arabic">
+<listitem>
+<simpara>Configure SDI-Observer to manage routes:</simpara>
+<screen># oc rollout status -n "$\{NAMESPACE:-sdi-observer}" -w dc/sdi-observer
+
+replication controller "sdi-observer-2" successfully rolled out</screen>
+<simpara>Depending on the services you want/need  to expose follow the post installation steps at section 5.5.1.2
+at <link xl:href="https://access.redhat.com/articles/5100521">https://access.redhat.com/articles/5100521</link></simpara>
+</listitem>
+</orderedlist>
+<simpara><emphasis role="strong">TODO</emphasis> Define the important ones for the demo Here</simpara>
+</section>
+<section xml:id="_check_that_sdi_is_working_properly">
+<title>Check that SDI is working properly</title>
+<simpara><emphasis role="strong">TODO</emphasis></simpara>
+</section>
+</section>
+</article>

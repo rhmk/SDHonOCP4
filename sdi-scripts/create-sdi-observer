@@ -1,20 +1,20 @@
 NAMESPACE=sdi-observer
 SDI_NAMESPACE=sdi
-#SLCB_NAMESPACE=sap-slcbridge
-OCP_MINOR_RELEASE=4.6
+SLCB_NAMESPACE=sap-slcbridge
+OCP_MINOR_RELEASE=4.7
 #NODE_LOG_FORMAT=text
 DEPLOY_SDI_REGISTRY=true
 INJECT_CABUNDLE=true
 #BUNDLE_SECRET_NAME=openshift-ingress-operator/router-ca
 MANAGE_VSYSTEM_ROUTE=true
-REDHAT_REGISTRY_SECRET_NAME=5318290-sap-di-westford-pull-secret
+REDHAT_REGISTRY_SECRET_NAME=$(oc get secret | awk '/pull-secret/ { print $1 }')
 SDI_NODE_SELECTOR=node-role.kubernetes.io/sdi=
-
+ 
 oc process -f https://raw.githubusercontent.com/redhat-sap/sap-data-intelligence/master/observer/ocp-template.json \
         NAMESPACE="${NAMESPACE:-sdi-observer}" \
-        SDI_NAMESPACE="${SDI_NAMESPACE:-sdi}" \ 
-        SLCB_NAMESPACE=sap-slcbridge="${SLCB_NAMESPACE:-sap-slcbridge}" \
-        OCP_MINOR_RELEASE="${OCP_MINOR_RELEASE:-4.6}" \
+        SDI_NAMESPACE="${SDI_NAMESPACE:-sdi}" \
+        SLCB_NAMESPACE="${SLCB_NAMESPACE:-sap-slcbridge}" \
+        OCP_MINOR_RELEASE="${OCP_MINOR_RELEASE:-4.7}" \
         DEPLOY_SDI_REGISTRY="${DEPLOY_SDI_REGISTRY:-true}" \
         INJECT_CABUNDLE="${INJECT_CABUNDLE:-true}" \
         MANAGE_VSYSTEM_ROUTE="${MANAGE_VSYSTEM_ROUTE:-true}" \
