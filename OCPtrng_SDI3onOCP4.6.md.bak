@@ -164,7 +164,6 @@ This is sufficient of a PoC (Proof of Concept) environments.
         ip-10-0-165-90.ec2.internal    NotReady   worker   2d23h   v1.20.0+5fbfd19
         ip-10-0-168-27.ec2.internal    NotReady   master   3d      v1.20.0+5fbfd19
 
-
     This can happen if the systems are shutdown for more then 24hrs and the certificates
     are set invalid. The following command will manually approve the new certificates:
 
@@ -613,9 +612,21 @@ and the proper installation of SDI
           fi
 
 
+## Ensure that the project service accounts have correct priviledges
+
+     # oc project sdi
+     # oc adm policy add-scc-to-group anyuid "system:serviceaccounts:$(oc project -q)"
+     # oc adm policy add-scc-to-user privileged -z "$(oc project -q)-elasticsearch"
+     # oc adm policy add-scc-to-user privileged -z "$(oc project -q)-fluentd"
+     # oc adm policy add-scc-to-user privileged -z default
+     # oc adm policy add-scc-to-user privileged -z mlf-deployment-api
+     # oc adm policy add-scc-to-user privileged -z vora-vflow-server
+     # oc adm policy add-scc-to-user privileged -z "vora-vsystem-$(oc project -q)"
+     # oc adm policy add-scc-to-user privileged -z "vora-vsystem-$(oc project -q)-vrep"
 
 Install SDI Install Bridge
 --------------------------
+
 
 Now that the SDI observer is running, we can install the SDI Install
 Bridge container that is used to install SDI on the cluster. The
@@ -634,9 +645,16 @@ following steps should run as the user `admin`.
 
 1.  Download the SAP install bridge from SAP (you need your S-User now)
 
-    Download SLCB01\_&lt;Version&gt;.EXE for Linux from
+    Go to the maintenance planner (MP) at https://apps.support.sap.com/sap/support/mp and create a new system:
+
+    ** Bilder **
+
+   Download the corresponding SLCB* file
+
+    Alternatively you can download SLCB01\_&lt;Version&gt;.EXE for Linux directly from
     <https://support.sap.com/>, rename it to `slcb` and make it
     executable (click `Software Downloads` and enter `Software Lifecycle Container Bridge` in the search field)
+
 
         # mv SLCB01_*.EXE /usr/bin/slcb
         # chmod +x /usr/bin/slcb
@@ -763,9 +781,9 @@ following steps should run as the user `admin`.
 
             Prerequisite Check Result
 
-            Name                      Current Value                         Result      Error Message    
-            KUBECONFIG                /home/generic_emea_mkoch/.kube/config + (passed)                    
-            Kubernetes Server Version 1.20.0                                + (passed)                    
+            Name                      Current Value                         Result      Error Message
+            KUBECONFIG                /home/generic_emea_mkoch/.kube/config + (passed)
+            Kubernetes Server Version 1.20.0                                + (passed)
 
             Choose "Retry (r)" to retry the Prerequisite Check.
             Choose "Next (n)" to continue.
@@ -1106,19 +1124,151 @@ Finally you can start the SDI Installation
 Post Installation work
 ----------------------
 
-1.  Configure SDI-Observer to manage routes:
+###  Get Access to the SDI console
 
-        # oc rollout status -n "$\{NAMESPACE:-sdi-observer}" -w dc/sdi-observer
+  We have configured the sdi-observer to make the route  to the admin interface available. You can check this with the following command:
+
+        # oc rollout status -n sdi-observer -w dc/sdi-observer
+
+   The system will come back with, if sdi-observer has exported the route correctly:
 
         replication controller "sdi-observer-2" successfully rolled out
 
-    Depending on the services you want/need to expose follow the post
-    installation steps at section 5.5.1.2 at
-    <https://access.redhat.com/articles/5100521>
+  You can double check with
 
-**TODO** Define the important ones for the demo Here
+        # oc get routes -n sdi
 
-Check that SDI is working properly
-----------------------------------
+  you will get a an output like:
 
-**TODO**
+        NAME      HOST/PORT                                                PATH   SERVICES   PORT      TERMINATION          WILDCARD
+        vsystem   vsystem-sdi.apps.cluster-1251.1251.example.opentlc.com          vsystem    vsystem   reencrypt/Redirect   None
+
+  You can now access the SDI management console at `https://vsystem-<SDI_NAMESPACE>.apps.<cluster_name>.<base_domain> `. In this example it is `https://vsystem-sdi.apps.cluster-1251.1251.example.opentlc.com`
+
+### Configure the Connection to Data Lake
+
+1. Login to the SDI Console at `https://vsystem-<SDI_NAMESPACE>.apps.<cluster_name>.<base_domain>` use the tenant `default`, user `defaultadmin` and the password from the installation procedure
+
+ ![image](images/post01.png)
+
+ ![image](images/post02.png)
+
+2. Click Connection Management tile
+ ![image](images/post03.png)
+
+3. Click on `+`
+![image](images/post04.png)
+
+4. Enter the following values and click `Test Connection`:
+
+  Parameter	            | Value
+  ----------------------|--------
+  Connection Type	      | SDL
+  Id	                  | DI_DATA_LAKE
+  Object Storage Type   |	S3
+  Endpoint              |	http://s3.openshift-storage.svc.cluster.local
+  Access Key ID	        |  from above (see storage-credentials.txt)
+  Secret Access Key	    |  from above (see storage-credentials.txt)
+  Root Path	            |  from above (see storage-credentials.txt)
+
+  ![image](images/post05.png)
+
+5. If connection test is successful click on `Create`
+
+  ![image](images/post06.png)
+
+6. done
+
+  ![image](images/post07.png)
+
+## SDI validation
+
+Finally you can do the following steps to validate that your installation of SAP Data Intelligence
+has been successful. The process is described at [Sap Data Intelligence Installation Guide](https://help.sap.com/viewer/a8d90a56d61a49718ebcb5f65014bbe7/3.1.2/en-US/1551785f3d7e4d37af7fe99185f7acb6.html)
+Now go back to the Data Intelligence Launchpad  (or login like in the previous step)
+
+###  Define a pipeline
+
+  1. Launch the Modeler running by clicking the Modeler tile (be patient, it takes a while)
+      ![image](images/validation01.png)
+
+  2. Enter `com.sap.demo.datagenerator` in the search field and click on Data Genrator.
+      ![image](images/validation02.png)
+
+  3. Save the configuration:
+      ![image](images/validation03.png)
+
+  4. Start the graph.
+      ![image](images/validation04.png)
+
+  5. Check that the status changes to Running (this may take several minutes).
+      ![image](images/validation05.png)
+
+  6. Open the Terminal user interface, by right-click the Terminal operator and selecting `OpenUI`.
+      ![image](images/validation06.png)
+
+  7. Once the Data Generator is running you will get something like the following, otherwise an error is shown
+      ![image](images/validation07.png)
+
+  8. Stop the graph once you observe its output in the Terminal.
+      ![image](images/validation08.png)
+
+### Check Your Machine Learning setup
+
+
+1. To create an ML scenario, open `ML Scenario Manager` from the SAP Data Intelligence Launchpad
+    ![image](images/validation-ml01.png)
+    Be patient the first start takes a while
+
+2. Click `Create` and
+
+     a. enter a name for your scenario and
+
+     b,  Optional: a business question that you want to answer (such as How strong will the weekly sales be in our store?)
+
+     c. Click `Create`.
+
+     ![image](images/validation-ml02.png)
+
+  The details for your scenario appear and your scenario is added to the list of ML scenarios on the overview page.
+
+3. On the details page for your scenario, click `Create` in the Notebooks tab  to create a new Jupyter Notebook.
+
+      a. In the Create Notebook dialog box, enter a unique name for your notebook.
+
+      b. Optional: Enter a description of your notebook.
+
+      c. Click Create to create your Jupyter notebook.
+
+     ![image](images/validation-ml03.png)
+
+    The creation takes a while until your notebook opens in JupyterLab.
+
+4. When you open your notebook for the first time, you are prompted to select your kernel. Choose Python 3.
+   ![image](images/validation-ml04.png)
+
+5. In your JupyterLab notebook, copy the following code into a cell and run it:
+
+        import sapdi
+        from hdfs import InsecureClient
+        client = InsecureClient('http://datalake:50070')
+        client.status("/")
+
+   ![image](images/validation-ml05.png)
+
+  Check that the code runs without errors.
+
+  The code should return JSON similar to the following:
+
+        {'pathSuffix': '',
+         'type': 'DIRECTORY',
+         'length': 0,
+         'owner': 'admin',
+         'group': 'admin',
+         'permission': '777',
+         'accessTime': 0,
+         'modificationTime': 1576237423061,
+         'blockSize': 0,
+         'replication': 1}
+
+ ![image](images/validation-ml06.png)

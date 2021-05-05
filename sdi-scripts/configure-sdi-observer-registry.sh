@@ -11,11 +11,11 @@
  
   ## Obtain registry hostname
   reg_hostname="$(oc get route -n "${NAMESPACE:-sdi-observer}" container-image-registry -o jsonpath='{.spec.host}')"
-  echo "================================================="
-  echo "Using registry: $reg_hostname"
-  echo "USER: $reg_user"
-  echo "PW  : $reg_pw"
-  echo "================================================="
+  echo "=================================================" | tee registry-credentials.txt
+  echo "Using registry: $reg_hostname"                     | tee -a registry-credentials.txt
+  echo "USER: $reg_user"                                   | tee -a registry-credentials.txt
+  echo "PW  : $reg_pw"                                     | tee -a registry-credentials.txt
+  echo "=================================================" | tee -a registry-credentials.txt
  
   if [ -z "$reg_user" -o -z "$reg_pw" ]; then
              echo "Something went wrong. Check if the pods are running"
@@ -60,9 +60,11 @@
             -p '{"spec":{"additionalTrustedCA":{"name":"'"$cmName"'"}}}'
     fi
     # Check that the certifcate is deployed
+    sleep 20 # wait for distribution of certificates
+    echo "======== Configured Registries =========="
     oc rsh -n openshift-image-registry "$(oc get pods -n openshift-image-registry -l docker-registry=default | \
           awk '/Running/ {print $1; exit}')" ls -1 /etc/pki/ca-trust/source/anchors
- 
+     
   else
     echo "Registry setup failed, please repair before you continue"
   fi

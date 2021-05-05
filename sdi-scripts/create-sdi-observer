@@ -10,6 +10,7 @@ MANAGE_VSYSTEM_ROUTE=true
 REDHAT_REGISTRY_SECRET_NAME=$(oc get secret | awk '/pull-secret/ { print $1 }')
 SDI_NODE_SELECTOR=node-role.kubernetes.io/sdi=
  
+oc project ${NAMESPACE}
 oc process -f https://raw.githubusercontent.com/redhat-sap/sap-data-intelligence/master/observer/ocp-template.json \
         NAMESPACE="${NAMESPACE:-sdi-observer}" \
         SDI_NAMESPACE="${SDI_NAMESPACE:-sdi}" \

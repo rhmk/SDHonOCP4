@@ -1,0 +1,3 @@
+[ocp]
+#bastion.1251.example.opentlc.com ansible_user=generic_emea_mkoch
+bastion.f978.dynamic.opentlc.com ansible_user=generic_emea_mkoch

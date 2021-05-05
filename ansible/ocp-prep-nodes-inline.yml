@@ -1,0 +1,185 @@
+---
+- name: Prepare OCP Worker Nodes for SDI
+  hosts: ocp
+
+  vars_prompt:
+         - name: "guid"
+           prompt: "Enter GUID"
+           private: no
+           default: "{{ lookup('env', 'GUID') }}"
+
+         - name: "ocadmin"
+           prompt: "User"
+           private: no
+           default: "admin"
+
+         - name: "ocpass"
+           prompt: "password"
+           private: yes
+
+         - name: "ocapi"
+           prompt: "OpenShift API"
+           private: no
+           default: "https://api.cluster-{{ guid }}.dynamic.opentlc.com:6443"
+           #default: https://api.cluster-{{ guid }}.{{ guid }}.example.opentlc.com:6443
+
+  module_defaults:
+      group/k8s:
+        host: "{{ ocapi }}"
+        validate_certs: no
+
+  tasks:
+  - block:
+    - name: Log in (obtain access token)
+      k8s_auth:
+        username: "{{ ocadmin }}"
+        password: "{{ ocpass }}"
+      register: k8s_auth_results
+
+    # Previous task provides the token/api_key, while all other parameters
+    # are taken from module_defaults
+    - name: Get a list of all nodes from any namespace
+      k8s_info:
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+        kind: Node
+      register: node_list
+
+    - name: Add Nodenames to worker list
+      set_fact:
+            worker_list: "{{ worker_list | default([]) + [info.metadata.name] }}"
+      when: '"node-role.kubernetes.io/worker" in info.metadata.labels'
+      loop: "{{ node_list.resources  }}"
+      loop_control:
+            loop_var: info
+            label: "{{ info.metadata.uid }}"
+    
+    - name: Ensure Worker Nodes are labeled for SDI use
+      k8s:
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Node
+          metadata:
+            name: "{{ workernode }}"
+            labels:
+              node-role.kubernetes.io/sdi: ""
+      loop: "{{ worker_list  }}"
+      loop_control:
+            loop_var: workernode
+
+    - name: Ensure net-raw capability is enabled for containers on schedulable nodes
+      k8s:
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+        state: present
+        definition:
+          apiVersion: machineconfiguration.openshift.io/v1
+          kind: MachineConfig
+          metadata:
+            labels:
+              machineconfiguration.openshift.io/role: sdi
+            name: 97-crio-net-raw
+          spec:
+            config:
+              ignition:
+                version: 2.2.0
+              storage:
+                files:
+                  - contents:
+                      source: data:text/plain;charset=utf-8;base64,W2NyaW8ucnVudGltZV0KZGVmYXVsdF9jYXBhYmlsaXRpZXMgPSBbCiAgICAgICAgIkNIT1dOIiwKICAgICAgICAiREFDX09WRVJSSURFIiwKICAgICAgICAiRlNFVElEIiwKICAgICAgICAiRk9XTkVSIiwKICAgICAgICAiU0VUR0lEIiwKICAgICAgICAiU0VUVUlEIiwKICAgICAgICAiU0VUUENBUCIsCiAgICAgICAgIk5FVF9CSU5EX1NFUlZJQ0UiLAogICAgICAgICJLSUxMIiwKICAgICAgICAiTkVUX1JBVyIsCl0K
+                      verification: {}
+                    filesystem: root
+                    mode: 420
+                    path: /etc/crio/crio.conf.d/90-default-capabilities
+
+    - name: Ensure needed additional kernel modules are pre-loaded
+      k8s:
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+        state: present
+        definition:
+          apiVersion: machineconfiguration.openshift.io/v1
+          kind: MachineConfig
+          metadata:
+            labels:
+              machineconfiguration.openshift.io/role: sdi
+            name: 75-worker-sap-data-intelligence
+          spec:
+            config:
+              ignition:
+                version: 2.2.0
+              storage:
+                files:
+                  - contents:
+                      source: "data:text/plain;charset=utf-8;base64,bmZzZApuZnN2NAppcF90YWJsZXMKaXB0X1JFRElSRUNUCmlwdF9vd25lcgo="
+                      verification: {}
+                    filesystem: root
+                    mode: 420
+                    path: /etc/modules-load.d/sdi-dependencies.conf
+              systemd:
+                units:
+                  - contents: |
+                      [Unit]
+                      Description=Pre-load kernel modules for SAP Data Intelligence
+                      After=network.target
+          
+                      [Service]
+                      Type=oneshot
+                      ExecStart=/usr/sbin/modprobe iptable_nat
+                      ExecStart=/usr/sbin/modprobe iptable_filter
+                      RemainAfterExit=yes
+          
+                      [Install]
+                      WantedBy=multi-user.target
+                    enabled: true
+                    name: sdi-modules-load.service
+
+    - name: Ensure maximum number of PIDs per container
+      k8s:
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+        state: present
+        definition:
+          apiVersion: machineconfiguration.openshift.io/v1
+          kind: ContainerRuntimeConfig
+          metadata:
+            name: sdi-pids-limit
+          spec:
+            machineConfigPoolSelector:
+              matchLabels:
+                workload: sapdataintelligence
+            containerRuntimeConfig:
+              pidsLimit: 16384
+
+    - name: Ensure MachineConfigs are associated
+      k8s:
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+        state: present
+        definition:
+          apiVersion: machineconfiguration.openshift.io/v1
+          kind: MachineConfigPool
+          metadata:
+            labels:
+              workload: sapdataintelligence
+            name: sdi
+          spec:
+            machineConfigSelector:
+              matchExpressions:
+                - key: machineconfiguration.openshift.io/role
+                  operator: In
+                  values:
+                    - sdi
+                    - worker
+            nodeSelector:
+              matchExpressions:
+                - key: node-role.kubernetes.io/sdi
+                  operator: Exists
+                - key: node-role.kubernetes.io/master
+                  operator: DoesNotExist 
+
+    always:
+    - name: If login succeeded, try to log out (revoke access token)
+      when: k8s_auth_results.k8s_auth.api_key is defined
+      k8s_auth:
+        state: absent
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+
+
