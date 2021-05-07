@@ -852,7 +852,7 @@ following steps should run as the user `admin`.
 
                 $ oc port-forward svc/slcbridgebase-service 8443:9000
 
-             Now you can point your browser to <https://localhost:8443> to access the installer
+        Now you can point your browser to <https://localhost:8443> to access the installer
 
      > **Note**
       >
