@@ -860,10 +860,9 @@ following steps should run as the user `admin`.
       > installation
 
       If everything worked well, you should see this page now:
+      ![image](images/image10.png)
 
-        ![image](images/image10.png)
-
-     Keep this page Open and continue in the maintenance planner window
+      Keep this page Open and continue in the maintenance planner window
 
 SDI installation
 ----------------
