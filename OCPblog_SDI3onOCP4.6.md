@@ -120,7 +120,6 @@ To make it easy, we assume a linux workstation based on RHEL or Fedora is assume
 
 2.  Ensure the following software is installed
 
-    - jq for parsing json
     - ansible for automating the setup together with the python modules for managing Openshift
      - python3-pyyaml
      - python3-urllib3.noarch
@@ -130,11 +129,17 @@ To make it easy, we assume a linux workstation based on RHEL or Fedora is assume
     - yum-utils for managing repositories
     - git for loading data from github
 
-    On RHEL 8 issue the following commands
-        # dnf -y install ttps://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
-        # sudo dnf -y ansible jq python3-pyyaml python3-urllib3 python3-requests python3-requests-oauthlib python3-openshift yum-utils
+    On RHEL 8 issue the following commands as root:
 
-3. Install an openshift client according to your OCP version
+        # dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
+        # dnf -y ansible python3-pyyaml python3-urllib3 python3-requests python3-requests-oauthlib python3-openshift yum-utils
+
+3. make sure jq version 1.6 is installed fro parsing JSON
+
+        # curl -L -O /usr/local/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64
+        # chmod a+x /usr/local/bin/jq
+
+4. Install an openshift client according to your OCP version
 
         # OCP_VERSION=4.7.2
         # wget https://mirror.openshift.com/pub/openshift-v4/clients/ocp/${OCP_VERSION}/openshift-client-linux-${OCP_VERSION}.tar.gz
@@ -142,11 +147,11 @@ To make it easy, we assume a linux workstation based on RHEL or Fedora is assume
         # sudo rm -f openshift-client-linux-${OCP_VERSION}.tar.gz /usr/bin/README.md
         # sudo chmod +x /usr/bin/oc /usr/bin/kubectl
 
-4.  setup bash completion (optional)
+5.  setup bash completion (optional)
 
         oc completion bash | sudo tee /etc/bash_completion.d/openshift > /dev/null
 
-5. Clone the github repository with the ansible playbooks for configuring the clustername
+6. Clone the github repository with the ansible playbooks for configuring the clustername
 
        # git clone https://github.com/redhat-sap/??? TODO
 
@@ -225,13 +230,10 @@ To make it easy, we assume a linux workstation based on RHEL or Fedora is assume
 prepare OCP cluster for SDI
 ===========================
 
-Switch to the directory with the ansible playbooks:
-
-1. The playbook `ocp_prep_nodes.yml` will label *all* worker nodes in your cluster for use with SDI.
+Switch to the directory with the ansible playbooks.
+The playbook `ocp_prep_nodes.yml` will label *all* worker nodes in your cluster for use with SDI.
    Please change the variable `sdi_configure_ocp_worker_nodelist` if you want something different.
-   you can also change the when statement, so that additional properties can be used for selecting nodes for SDI, e.g.
-
-    ....
+   you can also change the when statement, so that additional properties can be used for selecting nodes for SDI.
 
   The playbook will perform the following steps on all nodes in `sdi_configure_ocp_worker_nodelist`:
 
@@ -372,7 +374,7 @@ The playbook does the following;
 6.  Check Registry, get the credentials and configure OCP to trust the new registry
 
     The follwoing script tests the registry, prints the access
-    credentials (which are needed for the installation) and makes some required additional settings in the cluster to trust the deployed DEPLOY\_SDI\_REGISTRY:
+    credentials (which are needed for the installation) and makes some required additional settings in the cluster to trust the registry deployed by sdi-observer:
 
           #!/bin/bash
 
