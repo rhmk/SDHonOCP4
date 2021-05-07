@@ -928,13 +928,13 @@ Finally you can start the SDI Installation
 
     ![image](images/image25.png)
 
-13.  enable Checkpoint store
+13. enable Checkpoint store
 
     ensure the checkmark is set
-
     ![image](images/image8.png)
 
-    select `S3 Compatible object store` ![image](images/image1.png)
+    select `S3 Compatible object store`
+    ![image](images/image1.png)
 
     Use the name and credentials for checkpoint store created earlier,
     the endpoint for NooBa S3 is always
@@ -950,23 +950,19 @@ Finally you can start the SDI Installation
     while. Don’t worry. If it fails, double check that you use http and
     not https. With private certificates this may not work
 
-14.  Continue with the defaults on the next screens
+14. Continue with the defaults on the next screens
 
     Use the default storage class for persistent volumes
-
     ![image](images/image5.png)
 
     no special docker log path
-
     ![image](images/image7.png)
 
     Enable Kaniko
-
     ![image](images/image22.png)
 
     You do not need a differnt container image repo for modeler for demo
     purpose
-
     ![image](images/image24.png)
 
     Enable load Kernel Modules, although this has been already handled
