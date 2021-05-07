@@ -902,23 +902,21 @@ Finally you can start the SDI Installation
    ![image](images/slcb05.png)
 
 8. Enter a password for he System Tenant Administrator
-  ![image](images/slcb06.png)
+   ![image](images/slcb06.png)
 
-9.  Enter the Default Tenant name:
+9. Enter the Default Tenant name:
+  ![image](images/image9.png)
 
-    ![image](images/image9.png)
-
-10.  Enter the Default Tenant Adminstrator name and password:
-
+10. Enter the Default Tenant Adminstrator name and password:
     ![image](images/image20.png)
 
-11.  As our cluster has direct access to the internet we do not need to
+11. As our cluster has direct access to the internet we do not need to
     set proxies. If this is different in you environment read [the SAP
     documentation](https://help.sap.com/viewer/a8d90a56d61a49718ebcb5f65014bbe7/3.1.latest/en-US/6a64f00a5ad643c79236b4a5fa09b79e.html)
 
     ![image](images/image14.png)
 
-12.  disable backup
+12. disable backup
 
     Do not configure backup: SAP Note 2918288
 
