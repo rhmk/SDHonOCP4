@@ -243,19 +243,19 @@ The playbook `ocp_prep_nodes.yml` will label *all* worker nodes in your cluster 
    4.  Increasing PID limits to 16384
    5.  Associate MachineConfigs defined in step in 2-3 to the nodes with the label sdi
 
-    It may take a while until all nodes are updated. The following
-    command can be used to wait until the change gets applied to all the
-    worker nodes:
+       It may take a while until all nodes are updated. The following
+       command can be used to wait until the change gets applied to all the
+       worker nodes:
 
            oc wait mcp/sdi --all --for=condition=updated
 
-    The following command lists steh status of the nodes:
+       The following command lists steh status of the nodes:
 
            oc get mcp
 
-    > **Note**
-    >
-    > If the update is not working, check the machineconfig operator
+       > **Note**
+       >
+       > If the update is not working, check the machineconfig operator
 
 6.  Now double check that settings are made
 
