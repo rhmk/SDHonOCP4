@@ -1146,3 +1146,5 @@ Now go back to the Data Intelligence Launchpad  (or login like in the previous s
          'replication': 1}
 
  ![image](images/validation-ml06.png)
+
+ You are done. You have successfully installed and tested SAP Data Intelligence
