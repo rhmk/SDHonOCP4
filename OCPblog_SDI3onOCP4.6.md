@@ -831,17 +831,17 @@ following steps should run as the user `admin`.
 
     2. If you chose node port, the Service is exposed on the given port on any node of the cluster:
 
-      Get the exposed node port and pick an IP address of one of the nodes
-      and point your browser to:
-      [https://&lt;IP&gt;:&lt;NodePort&gt;/docs/index.html](https://<IP>:<NodePort>/docs/index.html)
+       Get the exposed node port and pick an IP address of one of the nodes
+       and point your browser to:
+       [https://&lt;IP&gt;:&lt;NodePort&gt;/docs/index.html](https://<IP>:<NodePort>/docs/index.html)
 
-      -   Get IP: 
+       - Get IP: 
 
                 $ oc get node -o wide sdi-worker-1
                 NAME           STATUS   ROLES        AGE   VERSION           INTERNAL-IP    EXTERNAL-IP   OS-IMAGE                                                       KERNEL-VERSION                 CONTAINER-RUNTIME
                 sdi-worker-1   Ready    sdi,worker   14d   v1.19.0+9c69bdc   10.19.20.160   <none>        Red Hat Enterprise Linux CoreOS 46.82.202101131942-0 (Ootpa)   4.18.0-193.40.1.el8_2.x86_64   cri-o://1.19.1-2.rhaos4.6.git2af9ecf.el8
 
-      -   Get Port
+       - Get Port
 
                 $ oc get svc -n "${SLCB_NAMESPACE:-sap-slcbridge}" slcbridgebase-service -o jsonpath=$'{.spec.ports[0].nodePort}\n'
                 30578
