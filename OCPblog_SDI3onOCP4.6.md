@@ -982,15 +982,13 @@ Finally you can start the SDI Installation
 
     ![image](images/image12.png)
 
-15.  Change the clustername to sdidemo-ghpte-$GUID (Replace with you lab GUID)
-
+15. Change the clustername to sdidemo-ghpte-$GUID (Replace with you lab GUID)
     ![image](images/image6.png)
 
     Next is a summary of the installation parameters.
 
-9.  Kick of the installation Kick of the installation. After
+14.  Kick of the installation Kick of the installation. After
     installation the following screen appears
-
     ![image](images/image23.png)
 
 > **Caution**
